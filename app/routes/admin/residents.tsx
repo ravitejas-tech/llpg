@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Users, Building2, MapPin, IndianRupee, Bed, Phone, FileText, CheckCircle, AlertTriangle, ArrowRight, XCircle, Download, FileSpreadsheet, Pencil, Filter, Calendar, Plus } from 'lucide-react';
 import { Link } from 'react-router';
-import { supabase } from '~/lib/supabase';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Badge } from '~/components/ui/badge';
@@ -13,11 +12,11 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+import { useAdminBuildingIds } from '~/queries/buildings.query';
+import { useAdminResidents, useUpdateResidentStatus } from '~/queries/residents.query';
+
 export default function ResidentsPage() {
   const { user } = useAuthStore();
-  const [residents, setResidents] = useState<any[]>([]);
-  const [filtered, setFiltered] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
 
@@ -25,12 +24,24 @@ export default function ResidentsPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
 
-  useEffect(() => {
-    if (!user) return;
-    loadData();
-  }, [user]);
+  // Queries
+  const { data: buildingIds = [], isLoading: loadingBuildings } = useAdminBuildingIds({
+    variables: { adminId: user?.id || '' },
+    enabled: !!user?.id,
+  });
 
-  useEffect(() => {
+  const { data: residents = [], isLoading: loadingResidents } = useAdminResidents({
+    variables: { buildingIds },
+    enabled: buildingIds.length > 0,
+  });
+
+  const loading = loadingBuildings || (buildingIds.length > 0 && loadingResidents);
+
+  // Mutations
+  const { mutateAsync: updateStatus } = useUpdateResidentStatus();
+
+  // Derived state for filtering
+  const filtered = useMemo(() => {
     let result = residents;
     if (filterStatus !== 'ALL') {
       result = result.filter(r => r.status === filterStatus);
@@ -43,47 +54,13 @@ export default function ResidentsPage() {
         r.room?.room_number?.toLowerCase().includes(s)
       );
     }
-    setFiltered(result);
+    return result;
   }, [search, filterStatus, residents]);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      const { data: bldgs } = await supabase.from('buildings').select('id').eq('admin_id', user!.id);
-      const bIds = bldgs?.map(b => b.id) || [];
-      if (bIds.length === 0) {
-        setResidents([]);
-        return;
-      }
-
-      const { data } = await supabase
-        .from('residents')
-        .select(`
-          *,
-          building:buildings(name),
-          floor:floors(floor_number),
-          room:rooms(room_number),
-          seat:seats(seat_number)
-        `)
-        .in('building_id', bIds)
-        .order('created_at', { ascending: false });
-
-      if (data) {
-        setResidents(data);
-        setFiltered(data);
-      }
-    } catch (error) {
-       console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const handleApprove = async (id: string) => {
     try {
-      await supabase.from('residents').update({ status: 'ACTIVE' }).eq('id', id);
+      await updateStatus({ residentId: id, status: 'ACTIVE' });
       toast.success("Approved!");
-      loadData();
     } catch (e) {
       toast.error("Action failed");
     }
@@ -91,9 +68,8 @@ export default function ResidentsPage() {
 
   const handleReject = async (id: string) => {
     try {
-      await supabase.from('residents').update({ status: 'REJECTED' }).eq('id', id);
+      await updateStatus({ residentId: id, status: 'REJECTED' });
       toast.info("Rejected");
-      loadData();
     } catch (e) {
       toast.error("Action failed");
     }

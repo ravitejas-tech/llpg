@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '~/queries/client';
 import { useAuthStore } from '~/store/auth.store';
 import {
   isRouteErrorResponse,
@@ -57,7 +59,11 @@ export default function App() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Outlet />
+    </QueryClientProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

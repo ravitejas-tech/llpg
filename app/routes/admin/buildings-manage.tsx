@@ -1,21 +1,25 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
-import { Building2, Plus, ArrowLeft, Layers, Hash, Bed, Trash2, Pencil, CheckCircle2, XCircle, MoreVertical } from 'lucide-react';
-import { supabase } from '~/lib/supabase';
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router';
+import { Building2, Plus, ArrowLeft, Layers, Hash, Bed } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '~/components/ui/dialog';
 import { toast } from 'sonner';
 import { Label } from '~/components/ui/label';
 
+import { 
+  useBuildingById, 
+  useBuildingLayout, 
+  useAddFloor, 
+  useAddRoom 
+} from '~/queries/buildings.query';
+
 export default function ManageBuildingLayout() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [building, setBuilding] = useState<any>(null);
-  const [floors, setFloors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
   const [openFloor, setOpenFloor] = useState(false);
   const [openRoom, setOpenRoom] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
@@ -25,69 +29,52 @@ export default function ManageBuildingLayout() {
   const [newRoomNum, setNewRoomNum] = useState('');
   const [seatsInRoom, setSeatsInRoom] = useState('4');
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+  // Queries
+  const { data: building, isLoading: loadingBuilding } = useBuildingById({
+    variables: { buildingId: id || '' },
+    enabled: !!id,
+  });
 
-  async function loadData() {
-    try {
-      setLoading(true);
-      const [bRes, fRes] = await Promise.all([
-        supabase.from('buildings').select('*, address:addresses(*, city:cities(name))').eq('id', id).single(),
-        supabase.from('floors').select('*, rooms(*, seats(*))').eq('building_id', id).order('floor_number', { ascending: true })
-      ]);
-      
-      if (bRes.data) setBuilding(bRes.data);
-      if (fRes.data) setFloors(fRes.data);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to load building layout");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: floors = [], isLoading: loadingFloors } = useBuildingLayout({
+    variables: { buildingId: id || '' },
+    enabled: !!id,
+  });
+
+  const loading = loadingBuilding || loadingFloors;
+
+  // Mutations
+  const { mutateAsync: addFloorMutation } = useAddFloor();
+  const { mutateAsync: addRoomMutation } = useAddRoom();
 
   const addFloor = async () => {
-    if (!newFloorNum) return;
+    if (!newFloorNum || !id) return;
     try {
-      const { error } = await supabase.from('floors').insert({
-        building_id: id,
-        floor_number: newFloorNum
+      await addFloorMutation({
+        buildingId: id,
+        floorNumber: newFloorNum,
       });
-      if (error) throw error;
       toast.success("Floor added!");
       setOpenFloor(false);
       setNewFloorNum('');
-      loadData();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || "Failed to add floor");
     }
   };
 
   const addRoom = async () => {
     if (!newRoomNum || !selectedFloor) return;
     try {
-      const { data: room, error: re } = await supabase.from('rooms').insert({
-        floor_id: selectedFloor,
-        room_number: newRoomNum,
-        total_seats: Number(seatsInRoom)
-      }).select('id').single();
-      
-      if (re) throw re;
-
-      // Auto-create seats
-      const seats = Array.from({ length: Number(seatsInRoom) }).map((_, i) => ({
-        room_id: room.id,
-        seat_number: `B${i+1}`
-      }));
-      await supabase.from('seats').insert(seats);
+      await addRoomMutation({
+        floorId: selectedFloor,
+        roomNumber: newRoomNum,
+        totalSeats: Number(seatsInRoom),
+      });
 
       toast.success("Room and seats added!");
       setOpenRoom(false);
       setNewRoomNum('');
-      loadData();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || "Failed to add room");
     }
   };
 

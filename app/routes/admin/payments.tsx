@@ -1,7 +1,6 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { IndianRupee, CheckCircle, AlertTriangle, CalendarDays } from 'lucide-react';
-import { supabase } from '~/lib/supabase';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
@@ -23,6 +22,9 @@ import {
   FormMessage,
 } from '~/components/ui/form';
 
+import { useAdminBuildingIds } from '~/queries/buildings.query';
+import { useMonthlyPayments, useMarkPaymentPaid } from '~/queries/payments.query';
+
 const paymentSchema = z.object({
   payment_mode: z.enum(['UPI', 'Cash', 'Bank']),
   remarks: z.string().optional()
@@ -32,8 +34,6 @@ type PaymentFormValues = z.infer<typeof paymentSchema>;
 
 export default function PaymentsPage() {
   const { user } = useAuthStore();
-  const [payments, setPayments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -46,90 +46,36 @@ export default function PaymentsPage() {
     defaultValues: { payment_mode: 'UPI', remarks: '' }
   });
 
-  useEffect(() => {
-    if (!user) return;
-    loadData();
-  }, [user, filterMonth, filterYear]);
+  const { data: buildingIds = [] } = useAdminBuildingIds({
+    variables: { adminId: user?.id || '' },
+    enabled: !!user?.id,
+  });
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const { data: bldgs } = await supabase.from('buildings').select('id').eq('admin_id', user!.id);
-      const bIds = bldgs?.map(b => b.id) || [];
-      if (bIds.length === 0) {
-        setPayments([]);
-        return;
-      }
+  const { data: payments = [], isLoading: loading } = useMonthlyPayments({
+    variables: { 
+      buildingIds, 
+      month: parseInt(filterMonth), 
+      year: parseInt(filterYear) 
+    },
+    enabled: buildingIds.length > 0
+  });
 
-      const m = parseInt(filterMonth);
-      const y = parseInt(filterYear);
-
-      const { data: activeRes } = await supabase
-        .from('residents')
-        .select('id, monthly_rent, stay_type')
-        .in('building_id', bIds)
-        .eq('status', 'ACTIVE')
-        .eq('stay_type', 'MONTHLY');
-        
-      if (activeRes && activeRes.length > 0) {
-        const { data: existingPymts } = await supabase
-          .from('payments')
-          .select('resident_id')
-          .in('resident_id', activeRes.map(r=>r.id))
-          .eq('month', m)
-          .eq('year', y);
-          
-        const existingIds = existingPymts?.map(p => p.resident_id) || [];
-        
-        const missing = activeRes.filter(r => !existingIds.includes(r.id));
-        if (missing.length > 0) {
-           const inserts = missing.map(r => ({
-              resident_id: r.id,
-              month: m,
-              year: y,
-              amount: r.monthly_rent || 0,
-              status: 'PENDING'
-           }));
-           await supabase.from('payments').insert(inserts);
-        }
-      }
-
-      const { data } = await supabase
-        .from('payments')
-        .select(`
-          *,
-          resident:residents(name, phone, room_id, room:rooms(room_number))
-        `)
-        .in('resident_id', (await supabase.from('residents').select('id').in('building_id', bIds)).data?.map(r=>r.id)||[])
-        .eq('month', m)
-        .eq('year', y)
-        .order('status', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      setPayments(data || []);
-    } catch (err: unknown) {
-      if(err instanceof Error) console.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { mutateAsync: markPaid } = useMarkPaymentPaid();
 
   const onSubmit = async (values: PaymentFormValues) => {
     if (!selectedPayment) return;
     try {
-      await supabase.from('payments').update({
-        status: 'PAID',
-        paid_date: new Date().toISOString(),
+      await markPaid({
+        paymentId: selectedPayment.id,
         payment_mode: values.payment_mode,
         remarks: values.remarks || null
-      }).eq('id', selectedPayment.id);
+      });
       
       toast.success("Payment logged successfully");
       setDialogOpen(false);
       form.reset();
-      loadData();
-    } catch (err: unknown) {
-      if(err instanceof Error) toast.error(err.message);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to log payment");
     }
   };
 

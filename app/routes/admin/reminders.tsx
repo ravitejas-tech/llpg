@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Send, BellRing, Phone, IndianRupee, AlertTriangle, Users } from 'lucide-react';
-import { supabase } from '~/lib/supabase';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card';
@@ -8,60 +7,30 @@ import { formatCurrency } from '~/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { toast } from 'sonner';
 
+import { useAdminBuildingIds } from '~/queries/buildings.query';
+import { useDefaulters } from '~/queries/payments.query';
+
 export default function RemindersPage() {
   const { user } = useAuthStore();
-  const [defaulters, setDefaulters] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState((new Date().getMonth() + 1).toString());
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
 
-  useEffect(() => {
-    if (!user) return;
-    loadData();
-  }, [user, filterMonth, filterYear]);
+  const { data: buildingIds = [] } = useAdminBuildingIds({
+    variables: { adminId: user?.id || '' },
+    enabled: !!user?.id,
+  });
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const { data: bldgs } = await supabase.from('buildings').select('id').eq('admin_id', user!.id);
-      const bIds = bldgs?.map(b => b.id) || [];
-      if (bIds.length === 0) {
-        setDefaulters([]);
-        return;
-      }
+  const { data: defaulters = [], isLoading: loading } = useDefaulters({
+    variables: {
+      buildingIds,
+      month: parseInt(filterMonth),
+      year: parseInt(filterYear),
+    },
+    enabled: buildingIds.length > 0,
+  });
 
-      // We only care about PENDING status payments for this target month and year
-      const m = parseInt(filterMonth);
-      const y = parseInt(filterYear);
-
-      const resBase = await supabase.from('residents').select('id').in('building_id', bIds);
-      const resIds = resBase.data?.map(r => r.id) || [];
-
-      if(resIds.length > 0) {
-        const { data } = await supabase
-          .from('payments')
-          .select(`
-             *,
-             resident:residents(name, phone, room:rooms(room_number), building:buildings(name))
-          `)
-          .in('resident_id', resIds)
-          .eq('status', 'PENDING')
-          .eq('month', m)
-          .eq('year', y);
-        
-        setDefaulters(data || []);
-      } else {
-        setDefaulters([]);
-      }
-    } catch (error: unknown) {
-       if(error instanceof Error) console.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const sendReminder = async (id: string, name: string) => {
-    toast.success(`Payment reminder sent via SMS to ${name}`);
+  const sendReminder = async (id: string, name?: string) => {
+    toast.success(`Payment reminder sent via SMS to ${name || 'Unknown'}`);
   };
 
   const sendBulkReminder = () => {
