@@ -4,8 +4,8 @@ import { queryClient } from './client';
 
 export const locationKeys = {
   all: ['locations'] as const,
-  states: ['states'] as const,
-  cities: ['cities'] as const,
+  states: ['locations', 'states'] as const,
+  cities: ['locations', 'cities'] as const,
 };
 
 export const useStates = createQuery<any[]>({
