@@ -1,6 +1,6 @@
 import { createQuery } from 'react-query-kit';
 import { supabase, unwrapSupabaseResponse } from './utils';
-import { MONTH_NAMES } from '~/lib/utils';
+import { MONTH_NAMES, formatMonthYear } from '~/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -79,9 +79,9 @@ export const useAdminDashboard = createQuery<AdminDashboardData, { adminId: stri
       supabase.from('residents').select('*', { count: 'exact', head: true }).in('building_id', bIds).eq('status', 'ACTIVE'),
       supabase.from('residents').select('*', { count: 'exact', head: true }).in('building_id', bIds).eq('status', 'PENDING'),
       supabase.from('residents').select('*', { count: 'exact', head: true }).in('building_id', bIds).eq('status', 'VACATED').gte('vacate_date', new Date(now.getFullYear(), now.getMonth(), 1).toISOString()),
-      supabase.from('payments').select('amount').in('resident_id', rIds).eq('month', curMonth).eq('year', curYear).eq('status', 'PAID'),
-      supabase.from('payments').select('amount').in('resident_id', rIds).eq('month', curMonth).eq('year', curYear).eq('status', 'PENDING'),
-      supabase.from('payments').select('amount, month, year').in('resident_id', rIds).eq('status', 'PAID'),
+      supabase.from('payments').select('amount').in('resident_id', rIds).eq('month', formatMonthYear(curMonth, curYear)).eq('status', 'PAID'),
+      supabase.from('payments').select('amount').in('resident_id', rIds).eq('month', formatMonthYear(curMonth, curYear)).eq('status', 'PENDING'),
+      supabase.from('payments').select('amount, month').in('resident_id', rIds).eq('status', 'PAID'),
       supabase.from('expenses').select('amount, date').in('building_id', bIds),
     ]);
 
@@ -109,7 +109,8 @@ export const useAdminDashboard = createQuery<AdminDashboardData, { adminId: stri
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const m = d.getMonth() + 1;
       const y = d.getFullYear();
-      const monthRevenue = allPayments?.filter((p) => p.month === m && p.year === y).reduce((acc, p) => acc + Number(p.amount), 0) || 0;
+      const checkLabel = formatMonthYear(m, y);
+      const monthRevenue = allPayments?.filter((p) => p.month === checkLabel).reduce((acc, p) => acc + Number(p.amount), 0) || 0;
       const monthExpenses = allExpenses?.filter((e) => {
         const ed = new Date(e.date);
         return ed.getMonth() + 1 === m && ed.getFullYear() === y;
@@ -188,13 +189,14 @@ export const useFinancialReports = createQuery<MonthlyReportItem[], { adminId: s
     const resIds = resBase.data?.map((r) => r.id) || [];
 
     const [{ data: paymentsData }, { data: expensesData }] = await Promise.all([
-      supabase.from('payments').select('month, amount').in('resident_id', resIds).eq('year', variables.year).eq('status', 'PAID'),
+      supabase.from('payments').select('month, amount').in('resident_id', resIds).gte('month', `${variables.year}-01`).lte('month', `${variables.year}-12`).eq('status', 'PAID'),
       supabase.from('expenses').select('date, amount').in('building_id', bIds).gte('date', `${variables.year}-01-01`).lte('date', `${variables.year}-12-31`),
     ]);
 
     return MONTH_NAMES.map((name, index) => {
       const m = index + 1;
-      const income = paymentsData?.filter((p) => p.month === m).reduce((a, c) => a + Number(c.amount), 0) || 0;
+      const checkLabel = formatMonthYear(m, variables.year);
+      const income = paymentsData?.filter((p) => p.month === checkLabel).reduce((a, c) => a + Number(c.amount), 0) || 0;
       const expense = expensesData?.filter((e) => new Date(e.date).getMonth() + 1 === m).reduce((a, c) => a + Number(c.amount), 0) || 0;
       return { month: name, shortMonth: name.slice(0, 3), income, expense, profit: income - expense };
     });

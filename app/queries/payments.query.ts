@@ -2,6 +2,7 @@ import { createQuery, createMutation } from 'react-query-kit';
 import { supabase, unwrapSupabaseResponse } from './utils';
 import { queryClient } from './client';
 import type { Database } from '~/lib/supabase';
+import { formatMonthYear } from '~/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ export interface PaymentWithResident extends PaymentRow {
 export const paymentKeys = {
   all: ['payments'] as const,
   byResident: (residentId: string) => [...paymentKeys.all, 'resident', residentId] as const,
-  byMonthYear: (month: number, year: number) => [...paymentKeys.all, 'month', month, year] as const,
+  byMonth: (monthLabel: string) => [...paymentKeys.all, 'month', monthLabel] as const,
 };
 
 // ─── Queries ──────────────────────────────────────────────────────────────
@@ -35,64 +36,52 @@ interface PaymentsQueryVariables {
 
 /** Fetch payments for a given month/year across building IDs (admin view) */
 export const useMonthlyPayments = createQuery<PaymentWithResident[], PaymentsQueryVariables>({
-  queryKey: paymentKeys.all,
+  queryKey: ['monthly-payments'], // Will be extended with variables in hook
   fetcher: async (variables) => {
     if (variables.buildingIds.length === 0) return [];
 
-    // Get all residents for these buildings
-    const { data: resData } = await supabase
-      .from('residents')
-      .select('id')
-      .in('building_id', variables.buildingIds);
-      
-    const residentIds = resData?.map(r => r.id) || [];
-    if (residentIds.length === 0) return [];
-
-    // Auto-generate missing payment records for active monthly residents
+    // 1. Get ALL active monthly residents for these buildings
     const { data: activeRes } = await supabase
       .from('residents')
-      .select('id, monthly_rent, stay_type')
-      .in('id', residentIds)
+      .select('id, name, phone, room_id, monthly_rent, room:rooms(room_number), building:buildings(name)')
+      .in('building_id', variables.buildingIds)
       .eq('status', 'ACTIVE')
       .eq('stay_type', 'MONTHLY');
 
-    if (activeRes && activeRes.length > 0) {
-      const { data: existingPymts } = await supabase
-        .from('payments')
-        .select('resident_id')
-        .in('resident_id', activeRes.map((r) => r.id))
-        .eq('month', variables.month)
-        .eq('year', variables.year);
+    if (!activeRes || activeRes.length === 0) return [];
 
-      const existingIds = existingPymts?.map((p) => p.resident_id) || [];
-      const missing = activeRes.filter((r) => !existingIds.includes(r.id));
+    const residentIds = activeRes.map(r => r.id);
 
-      if (missing.length > 0) {
-        const inserts = missing.map((r) => ({
-          resident_id: r.id,
-          month: variables.month,
-          year: variables.year,
-          amount: r.monthly_rent || 0,
-          status: 'PENDING' as const,
-        }));
-        await supabase.from('payments').insert(inserts);
-      }
-    }
+    const monthLabel = formatMonthYear(variables.month, variables.year);
 
-    // Fetch payments with resident info
-    const response = await supabase
+    // 2. Fetch any existing payment records for these residents in the selected period
+    const { data: realPayments } = await supabase
       .from('payments')
       .select(`
         *,
         resident:residents(name, phone, room_id, room:rooms(room_number))
       `)
       .in('resident_id', residentIds)
-      .eq('month', variables.month)
-      .eq('year', variables.year)
-      .order('status', { ascending: false })
-      .order('created_at', { ascending: false });
+      .eq('month', monthLabel);
 
-    return unwrapSupabaseResponse(response) as PaymentWithResident[];
+    // 3. Merge: If a resident has no payment record, create a virtual PENDING one
+    const merged = activeRes.map(res => {
+      const real = realPayments?.find(p => p.resident_id === res.id);
+      if (real) return real;
+      
+      // Virtual entry
+      return {
+        id: `virtual-${res.id}`,
+        resident_id: res.id,
+        amount: res.monthly_rent || 0, 
+        status: 'PENDING',
+        month: monthLabel,
+        resident: res,
+        created_at: new Date().toISOString()
+      };
+    });
+
+    return (merged || []) as PaymentWithResident[];
   },
 });
 
@@ -104,7 +93,6 @@ export const useResidentPayments = createQuery<PaymentRow[], { residentId: strin
       .from('payments')
       .select('*')
       .eq('resident_id', variables.residentId)
-      .order('year', { ascending: false })
       .order('month', { ascending: false });
     return unwrapSupabaseResponse(response) as PaymentRow[];
   },
@@ -124,11 +112,10 @@ export const useMyPayments = createQuery<PaymentRow[], { userId: string }>({
 
     const response = await supabase
       .from('payments')
-      .select('*')
+      .select('*, resident:residents(name, phone, room:rooms(room_number))')
       .eq('resident_id', resData.id)
-      .order('year', { ascending: false })
-      .order('month', { ascending: false });
-    return unwrapSupabaseResponse(response) as PaymentRow[];
+      .order('created_at', { ascending: false });
+    return unwrapSupabaseResponse(response) as PaymentWithResident[];
   },
 });
 
@@ -136,7 +123,7 @@ export const useMyPayments = createQuery<PaymentRow[], { userId: string }>({
 export const useDefaulters = createQuery<PaymentWithResident[], { buildingIds: string[]; month: number; year: number }>({
   queryKey: paymentKeys.all,
   fetcher: async (variables) => {
-    if (variables.buildingIds.length === 0) return [];
+    if (!variables.buildingIds || variables.buildingIds.length === 0) return [];
 
     const { data: resData } = await supabase
       .from('residents')
@@ -154,8 +141,7 @@ export const useDefaulters = createQuery<PaymentWithResident[], { buildingIds: s
       `)
       .in('resident_id', residentIds)
       .eq('status', 'PENDING')
-      .eq('month', variables.month)
-      .eq('year', variables.year);
+      .eq('month', formatMonthYear(variables.month, variables.year));
 
     return unwrapSupabaseResponse(response) as PaymentWithResident[];
   },
@@ -165,22 +151,104 @@ export const useDefaulters = createQuery<PaymentWithResident[], { buildingIds: s
 
 interface MarkPaymentPaidVariables {
   paymentId: string;
-  payment_mode: 'UPI' | 'Cash' | 'Bank';
-  remarks: string | null;
 }
 
-export const useMarkPaymentPaid = createMutation<void, MarkPaymentPaidVariables>({
+export const useVerifyPayment = createMutation<void, { paymentId: string; month?: number; year?: number; resident_id?: string }>({
+  mutationFn: async (variables) => {
+    const isVirtual = variables.paymentId.startsWith('virtual-');
+    if (isVirtual) {
+       await supabase.from('payments').insert({
+         resident_id: variables.resident_id,
+         month: formatMonthYear(variables.month!, variables.year!),
+         amount: 0, // Should be fetched from resident initially, handled by admin
+         status: 'PAID',
+         paid_at: new Date().toISOString(),
+         paid_date: new Date().toISOString().split('T')[0],
+         payment_mode: 'UPI',
+       });
+    } else {
+       await supabase.from('payments').update({
+         status: 'PAID',
+         paid_at: new Date().toISOString(),
+         paid_date: new Date().toISOString().split('T')[0],
+         payment_mode: 'UPI',
+       }).eq('id', variables.paymentId);
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['monthly-payments'] });
+  },
+});
+
+export const useRejectPayment = createMutation<void, { paymentId: string; remarks: string; resident_id?: string; month?: number; year?: number }>({
+  mutationFn: async (variables) => {
+    const isVirtual = variables.paymentId.startsWith('virtual-');
+    if (isVirtual) {
+      await supabase.from('payments').insert({
+        resident_id: variables.resident_id,
+        month: formatMonthYear(variables.month!, variables.year!),
+        status: 'REJECTED',
+        remarks: variables.remarks,
+      });
+    } else {
+      await supabase.from('payments').update({
+        status: 'REJECTED',
+        remarks: variables.remarks,
+      }).eq('id', variables.paymentId);
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['monthly-payments'] });
+  },
+});
+
+interface SubmitPaymentVariables {
+  paymentId: string;
+  transactionRef: string;
+  screenshotUrl?: string;
+}
+
+export const useSubmitPayment = createMutation<void, SubmitPaymentVariables>({
   mutationFn: async (variables) => {
     const response = await supabase.from('payments').update({
-      status: 'PAID',
-      paid_date: new Date().toISOString(),
-      payment_mode: variables.payment_mode,
-      remarks: variables.remarks,
+      status: 'SUBMITTED',
+      transaction_ref: variables.transactionRef,
+      screenshot_url: variables.screenshotUrl,
+      submitted_at: new Date().toISOString(),
     }).eq('id', variables.paymentId);
     unwrapSupabaseResponse(response);
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: paymentKeys.all });
+  },
+});
+
+export const useMarkPaymentPaid = createMutation<void, { paymentId: string; payment_mode: any; remarks: any; resident_id?: string; month?: number; year?: number; amount?: number }>({
+  mutationFn: async (variables) => {
+    const isVirtual = variables.paymentId.startsWith('virtual-');
+    if (isVirtual) {
+      await supabase.from('payments').insert({
+        resident_id: variables.resident_id,
+        month: formatMonthYear(variables.month!, variables.year!),
+        status: 'PAID',
+        paid_date: new Date().toISOString().split('T')[0],
+        paid_at: new Date().toISOString(),
+        payment_mode: variables.payment_mode,
+        remarks: variables.remarks,
+        amount: variables.amount
+      });
+    } else {
+      await supabase.from('payments').update({
+        status: 'PAID',
+        paid_date: new Date().toISOString().split('T')[0],
+        paid_at: new Date().toISOString(),
+        payment_mode: variables.payment_mode,
+        remarks: variables.remarks,
+      }).eq('id', variables.paymentId);
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['monthly-payments'] });
   },
 });
 

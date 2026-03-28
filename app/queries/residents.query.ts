@@ -56,9 +56,9 @@ export const residentKeys = {
 
 /** Fetch all residents across admin's buildings */
 export const useAdminResidents = createQuery<ResidentWithRelations[], { buildingIds: string[] }>({
-  queryKey: residentKeys.all,
+  queryKey: residentKeys.all, // Extended with variables in hook
   fetcher: async (variables) => {
-    if (variables.buildingIds.length === 0) return [];
+    if (!variables.buildingIds || variables.buildingIds.length === 0) return [];
     const response = await supabase
       .from('residents')
       .select(`
@@ -76,7 +76,7 @@ export const useAdminResidents = createQuery<ResidentWithRelations[], { building
 
 /** Fetch a single resident by ID with full relations */
 export const useResidentById = createQuery<ResidentFull, { residentId: string }>({
-  queryKey: residentKeys.all,
+  queryKey: residentKeys.all, // Base key, hook extends it with variables
   fetcher: async (variables) => {
     const response = await supabase
       .from('residents')
@@ -141,6 +141,17 @@ interface AddResidentVariables {
 
 export const useAddResident = createMutation<void, AddResidentVariables>({
   mutationFn: async (variables) => {
+    // 1. Double-check seat availability
+    const { data: seat } = await supabase
+      .from('seats')
+      .select('status')
+      .eq('id', variables.seat_id)
+      .single();
+
+    if (seat?.status === 'OCCUPIED') {
+      throw new Error("Selected bed is already occupied. Please choose another one.");
+    }
+
     const insertResp = await supabase.from('residents').insert({
       name: variables.name,
       phone: variables.phone,

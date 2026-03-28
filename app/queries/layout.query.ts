@@ -68,7 +68,7 @@ export const useBuildingLayout = createQuery<FloorWithRooms[], { buildingId: str
 
 /** Fetch floors for a building (dropdown) */
 export const useFloors = createQuery<FloorBasic[], { buildingId: string }>({
-  queryKey: ['floors'],
+  queryKey: layoutKeys.floors(''), // Extended in hook
   fetcher: async (variables) => {
     const response = await supabase
       .from('floors')
@@ -80,7 +80,7 @@ export const useFloors = createQuery<FloorBasic[], { buildingId: string }>({
 
 /** Fetch rooms for a floor (dropdown) */
 export const useRooms = createQuery<RoomBasic[], { floorId: string; roomTypeId?: string; sharingTypeId?: string }>({
-  queryKey: ['rooms'],
+  queryKey: layoutKeys.rooms(''),
   fetcher: async (variables) => {
     let query = supabase
       .from('rooms')
@@ -101,14 +101,28 @@ export const useRooms = createQuery<RoomBasic[], { floorId: string; roomTypeId?:
 
 /** Fetch available seats for a room (dropdown) */
 export const useAvailableSeats = createQuery<SeatBasic[], { roomId: string }>({
-  queryKey: ['seats'],
+  queryKey: layoutKeys.seats(''),
   fetcher: async (variables) => {
-    const response = await supabase
+    // 1. Get ALL seats for this room
+    const { data: allSeats, error: sErr } = await supabase
       .from('seats')
       .select('id, seat_number')
+      .eq('room_id', variables.roomId);
+    
+    if (sErr || !allSeats) return [];
+
+    // 2. Get Occupied Seat IDs (from active residents)
+    const { data: occupied } = await supabase
+      .from('residents')
+      .select('seat_id')
       .eq('room_id', variables.roomId)
-      .eq('status', 'AVAILABLE');
-    return unwrapSupabaseResponse(response) as SeatBasic[];
+      .eq('status', 'ACTIVE')
+      .not('seat_id', 'is', null);
+
+    const occupiedIds = occupied?.map(o => o.seat_id) || [];
+
+    // 3. Return only truly available ones
+    return allSeats.filter(s => !occupiedIds.includes(s.id)) as SeatBasic[];
   },
 });
 

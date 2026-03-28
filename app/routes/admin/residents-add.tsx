@@ -26,7 +26,7 @@ import {
 const residentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().min(10, "Valid phone number required").max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  email: z.string().email("Valid email is required for registration"),
   stay_type: z.enum(['MONTHLY', 'DAILY']),
   monthly_rent: z.coerce.number().optional(),
   daily_rent: z.coerce.number().optional(),
@@ -186,7 +186,7 @@ export default function AddResidentPage() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email (Optional)</FormLabel>
+                        <FormLabel>Email *</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="you@example.com" {...field} />
                         </FormControl>

@@ -48,9 +48,9 @@ export interface CityBasic {
 
 export const buildingKeys = {
   all: ['buildings'] as const,
-  byAdmin: (adminId: string) => [...buildingKeys.all, 'admin', adminId] as const,
-  byId: (id: string) => [...buildingKeys.all, id] as const,
-  ids: (adminId: string) => [...buildingKeys.all, 'ids', adminId] as const,
+  byAdmin: (adminId: string) => ['buildings', 'admin', adminId] as const,
+  byId: (id: string) => ['buildings', 'detail', id] as const,
+  ids: (adminId: string) => ['buildings', 'ids', adminId] as const,
   cities: ['buildings', 'cities'] as const,
   layout: (buildingId: string) => ['buildings', 'layout', buildingId] as const,
 };
@@ -71,7 +71,8 @@ export const useAdminBuildings = createQuery<BuildingWithAddress[], { adminId: s
 
 /** Fetch building IDs for an admin (lightweight, for dependent queries) */
 export const useAdminBuildingIds = createQuery<string[], { adminId: string }>({
-  queryKey: buildingKeys.all,
+  queryKey: buildingKeys.ids(''),
+  staleTime: 0,
   fetcher: async (variables) => {
     const response = await supabase
       .from('buildings')
