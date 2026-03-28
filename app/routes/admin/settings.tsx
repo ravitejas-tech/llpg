@@ -1,4 +1,5 @@
-import { Settings2, UserCog, Building2, Bell } from 'lucide-react';
+import { Settings2, UserCog, Building2, Bell, Tags } from 'lucide-react';
+import { useNavigate, Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -7,6 +8,7 @@ import { useAuthStore } from '~/store/auth.store';
 
 export default function AdminSettings() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -73,8 +75,22 @@ export default function AdminSettings() {
         <CardHeader>
            <CardTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-emerald-500"/> System Setup</CardTitle>
         </CardHeader>
-        <CardContent>
-           <p className="text-slate-500 py-4">To modify building allocation boundaries or create new facilities, please contact the Super Admin team.</p>
+        <CardContent className="space-y-4">
+           <div className="flex items-center justify-between p-4 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors">
+             <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+                 <Tags className="w-5 h-5 text-indigo-600" />
+               </div>
+               <div>
+                 <p className="font-semibold text-slate-900">Room Configurations</p>
+                 <p className="text-sm text-slate-500">Manage AC/Non-AC types and sharing categories</p>
+               </div>
+             </div>
+             <Button variant="outline" onClick={() => navigate('/admin/room-types')}>
+               Manage Types
+             </Button>
+           </div>
+           <p className="text-xs text-slate-400 py-2">To modify building allocation boundaries or create new facilities, please contact the Super Admin team.</p>
         </CardContent>
       </Card>
     </div>

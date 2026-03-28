@@ -2,7 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowLeft, UserPlus, Building2 } from 'lucide-react';
-import { supabase } from '~/lib/supabase';
+import { useAdminBuildingsBasic } from '~/queries/buildings.query';
+import { useFloors, useRooms, useAvailableSeats } from '~/queries/layout.query';
+import { useRoomTypes, useSharingTypes } from '~/queries/room-types.query';
+import { useAddResident } from '~/queries/residents.query';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -23,13 +26,15 @@ import {
 const residentSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   phone: z.string().min(10, "Valid phone number required").max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address").optional().or(z.literal('')),
+  email: z.string().email("Valid email is required for registration"),
   stay_type: z.enum(['MONTHLY', 'DAILY']),
   monthly_rent: z.coerce.number().optional(),
   daily_rent: z.coerce.number().optional(),
   deposit_amount: z.coerce.number().optional(),
   building_id: z.string().min(1, "Building is required"),
   floor_id: z.string().min(1, "Floor is required"),
+  room_type_id: z.string().optional(),
+  sharing_type_id: z.string().optional(),
   room_id: z.string().min(1, "Room is required"),
   seat_id: z.string().min(1, "Seat/Bed is required"),
 }).superRefine((data, ctx) => {
@@ -54,11 +59,6 @@ type ResidentFormValues = z.infer<typeof residentSchema>;
 export default function AddResidentPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  
-  const [buildings, setBuildings] = useState<any[]>([]);
-  const [floors, setFloors] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [seats, setSeats] = useState<any[]>([]);
 
   const form = useForm<ResidentFormValues>({
     resolver: zodResolver(residentSchema),
@@ -72,6 +72,8 @@ export default function AddResidentPage() {
       deposit_amount: 0,
       building_id: '',
       floor_id: '',
+      room_type_id: '',
+      sharing_type_id: '',
       room_id: '',
       seat_id: ''
     }
@@ -79,13 +81,35 @@ export default function AddResidentPage() {
 
   const buildingId = useWatch({ control: form.control, name: 'building_id' });
   const floorId = useWatch({ control: form.control, name: 'floor_id' });
+  const roomTypeId = useWatch({ control: form.control, name: 'room_type_id' });
+  const sharingTypeId = useWatch({ control: form.control, name: 'sharing_type_id' });
   const roomId = useWatch({ control: form.control, name: 'room_id' });
   const stayType = useWatch({ control: form.control, name: 'stay_type' });
 
-  useEffect(() => {
-    if (!user) return;
-    supabase.from('buildings').select('id, name, monthly_rent, daily_rent, deposit_amount').eq('admin_id', user.id).then(({ data }) => setBuildings(data || []));
-  }, [user]);
+  const { data: buildings = [] } = useAdminBuildingsBasic({ 
+    variables: { adminId: user?.id || '' }, 
+    enabled: !!user?.id 
+  });
+  const { data: floors = [] } = useFloors({ 
+    variables: { buildingId: buildingId || '' }, 
+    enabled: !!buildingId 
+  });
+  const { data: rooms = [] } = useRooms({ 
+    variables: { 
+      floorId: floorId || '',
+      roomTypeId: roomTypeId || undefined,
+      sharingTypeId: sharingTypeId || undefined
+    }, 
+    enabled: !!floorId 
+  });
+  const { data: roomTypes = [] } = useRoomTypes();
+  const { data: sharingTypes = [] } = useSharingTypes();
+  const { data: seats = [] } = useAvailableSeats({ 
+    variables: { roomId: roomId || '' }, 
+    enabled: !!roomId 
+  });
+
+  const addResidentMutation = useAddResident();
 
   useEffect(() => {
     if (buildingId) {
@@ -95,52 +119,12 @@ export default function AddResidentPage() {
          form.setValue('daily_rent', Number(b.daily_rent) || 300);
          form.setValue('deposit_amount', Number(b.deposit_amount) || 5000);
        }
-       supabase.from('floors').select('id, floor_number').eq('building_id', buildingId).then(({ data }) => {
-         setFloors(data || []);
-       });
     }
-  }, [buildingId, buildings]);
-
-  useEffect(() => {
-    if (floorId) {
-       supabase.from('rooms').select('id, room_number').eq('floor_id', floorId).then(({ data }) => {
-         setRooms(data || []);
-       });
-    }
-  }, [floorId]);
-
-  useEffect(() => {
-    if (roomId) {
-       supabase.from('seats').select('id, seat_number').eq('room_id', roomId).eq('status', 'AVAILABLE').then(({ data }) => {
-         setSeats(data || []);
-       });
-    }
-  }, [roomId]);
+  }, [buildingId, buildings, form]);
 
   const onSubmit = async (values: ResidentFormValues) => {
     try {
-      // Create resident
-      const { error: resErr } = await supabase.from('residents').insert({
-        name: values.name,
-        phone: values.phone,
-        email: values.email || null,
-        building_id: values.building_id,
-        floor_id: values.floor_id,
-        room_id: values.room_id,
-        seat_id: values.seat_id,
-        stay_type: values.stay_type,
-        monthly_rent: values.stay_type === 'MONTHLY' ? values.monthly_rent : null,
-        daily_rent: values.stay_type === 'DAILY' ? values.daily_rent : null,
-        deposit_amount: values.deposit_amount ? values.deposit_amount : null,
-        status: 'ACTIVE',
-        join_date: new Date().toISOString()
-      }).select('id').single();
-
-      if (resErr) throw resErr;
-
-      // Mark seat as occupied
-      await supabase.from('seats').update({ status: 'OCCUPIED' }).eq('id', values.seat_id);
-
+      await addResidentMutation.mutateAsync(values as any);
       toast.success("Resident added successfully!");
       navigate('/admin/residents');
     } catch (err: any) {
@@ -202,7 +186,7 @@ export default function AddResidentPage() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email (Optional)</FormLabel>
+                        <FormLabel>Email *</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="you@example.com" {...field} />
                         </FormControl>
@@ -271,6 +255,59 @@ export default function AddResidentPage() {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="room_type_id"
+                    render={({ field }: { field: any }) => (
+                      <FormItem>
+                        <FormLabel>Room Type (Filter)</FormLabel>
+                        <Select 
+                          value={field.value} 
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue('room_id', '');
+                            form.setValue('seat_id', '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Any Type" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">Any Type</SelectItem>
+                            {roomTypes.map(rt => <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="sharing_type_id"
+                    render={({ field }: { field: any }) => (
+                      <FormItem>
+                        <FormLabel>Sharing (Filter)</FormLabel>
+                        <Select 
+                          value={field.value} 
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue('room_id', '');
+                            form.setValue('seat_id', '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Any Sharing" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">Any Sharing</SelectItem>
+                            {sharingTypes.map(st => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="room_id"

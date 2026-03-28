@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router';
-import { Building2, Users, IndianRupee, Receipt, Bell, BarChart3, Settings, LogOut, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, Users, IndianRupee, Receipt, Bell, BarChart3, Settings, LogOut, LayoutDashboard, Menu, X, ChevronLeft, ChevronRight, Tags } from 'lucide-react';
 import { useAuthStore } from '~/store/auth.store';
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
@@ -37,6 +37,7 @@ export default function AdminLayout() {
     { icon: Receipt, label: 'Expenses', path: '/admin/expenses' },
     { icon: Bell, label: 'Reminders', path: '/admin/reminders' },
     { icon: BarChart3, label: 'Reports', path: '/admin/reports' },
+    { icon: Tags, label: 'Room Types', path: '/admin/room-types' },
     { icon: Settings, label: 'Settings', path: '/admin/settings' },
   ];
 

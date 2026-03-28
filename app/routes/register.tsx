@@ -1,127 +1,93 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Building2, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '~/lib/supabase';
+import { toast } from 'sonner';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
+import {
+  useRegistrationBuildings,
+  useRegistrationFloors,
+  useRegistrationRooms,
+  useRegistrationSeats,
+  useRegistrationStates,
+  useRegistrationCities,
+  useRegistrationRoomTypes,
+  useRegistrationSharingTypes,
+  useRegisterUser
+} from '~/queries/register.query';
 
-interface State { id: string; name: string; }
-interface City { id: string; name: string; state_id: string; }
-interface Building { id: string; name: string; }
+import { useAuthStore } from '~/store/auth.store';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const authStore = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPwd, setShowPwd] = useState(false);
-  const [states, setStates] = useState<State[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
-  const [buildings, setBuildings] = useState<Building[]>([]);
-  const [floors, setFloors] = useState<any[]>([]);
-  const [rooms, setRooms] = useState<any[]>([]);
-  const [seats, setSeats] = useState<any[]>([]);
-
+  
   const [form, setForm] = useState({
     name: '', phone: '', email: '',
-    building_id: '', floor_id: '', room_id: '', seat_id: '',
+    building_id: '', floor_id: '', room_type_id: '', sharing_type_id: '', room_id: '', seat_id: '',
     line_one: '', line_two: '', state_id: '', city_id: '', pincode: '',
     password: '', confirm_password: '',
   });
 
-  useEffect(() => {
-    supabase.from('states').select('id,name').order('name').then(({ data }) => setStates(data || []));
-    supabase.from('buildings').select('id,name').eq('status', 'ACTIVE').order('name').then(({ data }) => setBuildings(data || []));
-  }, []);
+  const { data: states = [] } = useRegistrationStates();
+  const { data: buildings = [] } = useRegistrationBuildings();
+  const { data: roomTypes = [] } = useRegistrationRoomTypes();
+  const { data: sharingTypes = [] } = useRegistrationSharingTypes();
 
-  useEffect(() => {
-    if (form.state_id) {
-      supabase.from('cities').select('id,name,state_id').eq('state_id', form.state_id).order('name').then(({ data }) => setCities(data || []));
-    }
-  }, [form.state_id]);
+  const { data: cities = [] } = useRegistrationCities({
+    variables: { stateId: form.state_id },
+    enabled: !!form.state_id,
+  });
 
-  useEffect(() => {
-    if (form.building_id) {
-      supabase.from('floors').select('id, floor_number').eq('building_id', form.building_id).then(({ data }) => setFloors(data || []));
-    }
-  }, [form.building_id]);
+  const { data: floors = [] } = useRegistrationFloors({
+    variables: { buildingId: form.building_id },
+    enabled: !!form.building_id,
+  });
 
-  useEffect(() => {
-    if (form.floor_id) {
-      supabase.from('rooms').select('id, room_number').eq('floor_id', form.floor_id).then(({ data }) => setRooms(data || []));
-    }
-  }, [form.floor_id]);
+  const { data: rooms = [] } = useRegistrationRooms({
+    variables: { 
+      floorId: form.floor_id, 
+      roomTypeId: form.room_type_id, 
+      sharingTypeId: form.sharing_type_id 
+    },
+    enabled: !!form.floor_id,
+  });
 
-  useEffect(() => {
-    if (form.room_id) {
-      supabase.from('seats').select('id, seat_number').eq('room_id', form.room_id).eq('status', 'AVAILABLE').then(({ data }) => setSeats(data || []));
-    }
-  }, [form.room_id]);
+  const { data: seats = [] } = useRegistrationSeats({
+    variables: { roomId: form.room_id },
+    enabled: !!form.room_id,
+  });
 
   const update = useCallback((field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
   }, []);
 
+  const { mutateAsync: registerUser } = useRegisterUser();
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (form.password !== form.confirm_password) { setError('Passwords do not match'); return; }
-    if (form.password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (form.password !== form.confirm_password) return setError("Passwords do not match");
 
     setLoading(true);
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
-        options: { data: { name: form.name } }
-      });
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Registration failed');
-
-      const userId = authData.user.id;
-
-      // Create address
-      const { data: addrData, error: addrError } = await supabase
-        .from('addresses')
-        .insert({ line_one: form.line_one, line_two: form.line_two || null, pincode: form.pincode, city_id: form.city_id })
-        .select('id')
-        .maybeSingle();
-      if (addrError) throw addrError;
-      if (!addrData) throw new Error("Failed connecting to address layout");
-
-      // Create user_role
-      await supabase.from('user_roles').insert({
-        user_id: userId,
-        role: 'RESIDENT',
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-      });
-
-      // Create resident (PENDING approval)
-      await supabase.from('residents').insert({
-        user_id: userId,
-        building_id: form.building_id,
-        floor_id: form.floor_id,
-        room_id: form.room_id,
-        seat_id: form.seat_id,
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-        status: 'PENDING',
-        address_id: addrData.id,
-      });
-
-      navigate('/login?registered=true');
+      await registerUser(form as any);
+      // Initialize auth store to capture the new session/role
+      await authStore.initialize();
+      toast.success("Registration successful!");
+      navigate('/resident');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [form, navigate]);
+  }, [form, navigate, registerUser, authStore]);
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -196,18 +162,53 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Room *</Label>
-                    <Select value={form.room_id} onValueChange={v => { update('room_id', v); update('seat_id', ''); }} disabled={!form.floor_id}>
-                      <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
+                    <Label>Room Type (Optional)</Label>
+                    <Select value={form.room_type_id} onValueChange={v => { update('room_type_id', v); update('room_id', ''); update('seat_id', ''); }}>
+                      <SelectTrigger><SelectValue placeholder="Any Type" /></SelectTrigger>
                       <SelectContent>
-                        {rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.room_number}</SelectItem>)}
+                        <SelectItem value="none">Any Type</SelectItem>
+                        {roomTypes.map(rt => <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Sharing (Optional)</Label>
+                    <Select value={form.sharing_type_id} onValueChange={v => { update('sharing_type_id', v); update('room_id', ''); update('seat_id', ''); }}>
+                      <SelectTrigger><SelectValue placeholder="Any Sharing" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Any Sharing</SelectItem>
+                        {sharingTypes.map(st => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Room *</Label>
+                    <Select value={form.room_id} onValueChange={v => { update('room_id', v); update('seat_id', ''); }} disabled={!form.floor_id || rooms.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          !form.floor_id 
+                            ? "Select Floor First" 
+                            : rooms.length === 0 
+                              ? `No ${roomTypes.find(rt => rt.id === form.room_type_id)?.name || ''} ${sharingTypes.find(st => st.id === form.sharing_type_id)?.name || ''} rooms available`
+                              : "Select Room"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.room_number}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {form.floor_id && rooms.length === 0 && (
+                      <p className="text-[10px] text-red-500 font-medium">
+                        No rooms available for {roomTypes.find(rt => rt.id === form.room_type_id)?.name || 'any'} and {sharingTypes.find(st => st.id === form.sharing_type_id)?.name || 'any'} configuration on this floor.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <Label>Seat/Bed *</Label>
-                    <Select value={form.seat_id} onValueChange={v => update('seat_id', v)} disabled={!form.room_id}>
-                      <SelectTrigger><SelectValue placeholder={seats.length ? "Select Bed" : "No beds available"} /></SelectTrigger>
+                    <Select value={form.seat_id} onValueChange={v => update('seat_id', v)} disabled={!form.room_id || seats.length === 0}>
+                      <SelectTrigger><SelectValue placeholder={!form.room_id ? "Select Room First" : seats.length ? "Select Bed" : "No beds available"} /></SelectTrigger>
                       <SelectContent>
                         {seats.map(s => <SelectItem key={s.id} value={s.id}>{s.seat_number}</SelectItem>)}
                       </SelectContent>

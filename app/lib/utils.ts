@@ -10,6 +10,9 @@ export const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+export const formatMonthYear = (month: number, year: number) => 
+  `${year}-${String(month).padStart(2, '0')}`;
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',

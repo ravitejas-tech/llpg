@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Building2, Plus, MapPin, Layers, Settings2, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router';
-import { supabase } from '~/lib/supabase';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -11,11 +10,29 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { Label } from '~/components/ui/label';
 
+// Query hooks
+import { 
+  useAdminBuildings, 
+  useCities, 
+  useAddBuilding, 
+  useUpdateBuildingSettings 
+} from '~/queries/buildings.query';
+
 export default function BuildingsPage() {
   const { user } = useAuthStore();
-  const [buildings, setBuildings] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Queries
+  const { data: buildings = [], isLoading: loadingBuildings } = useAdminBuildings({
+    variables: { adminId: user?.id || '' },
+    enabled: !!user?.id,
+  });
+  
+  const { data: cities = [] } = useCities();
+
+  // Mutations
+  const { mutateAsync: addBuilding, isPending: addingBuilding } = useAddBuilding();
+  const { mutateAsync: updateSettings, isPending: updatingSettings } = useUpdateBuildingSettings();
+
   const [openAdd, setOpenAdd] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
   const [selectedBldg, setSelectedBldg] = useState<any>(null);
@@ -24,65 +41,24 @@ export default function BuildingsPage() {
   const [newBldg, setNewBldg] = useState({ name: '', line_one: '', city_id: '', floors: '1', rooms_per_floor: '4' });
   const [setts, setSetts] = useState({ monthly_rent: '', daily_rent: '', deposit_amount: '' });
 
-  useEffect(() => {
-    if (!user) return;
-    loadData();
-    supabase.from('cities').select('id, name').then(({ data }) => setCities(data || []));
-  }, [user]);
-
-  async function loadData() {
-    try {
-      setLoading(true);
-      const { data } = await supabase
-        .from('buildings')
-        .select('*, address:addresses(*, city:cities(name))')
-        .eq('admin_id', user!.id);
-      setBuildings(data || []);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   const onAddBuilding = async () => {
     try {
       if (!newBldg.city_id || !newBldg.name) return toast.error("Please fill required fields");
       
-      const { data: addr, error: ae } = await supabase.from('addresses').insert({
+      await addBuilding({
+        name: newBldg.name,
         line_one: newBldg.line_one,
         city_id: newBldg.city_id,
-        pincode: '000000'
-      }).select('id').single();
-      if (ae) throw ae;
-
-      const { data: bldg, error: be } = await supabase.from('buildings').insert({
-        name: newBldg.name,
-        address_id: addr.id,
         admin_id: user!.id,
-        status: 'ACTIVE'
-      }).select('id').single();
-      if (be) throw be;
-
-      // Auto-generate layout
-      const fNum = Number(newBldg.floors);
-      const rNum = Number(newBldg.rooms_per_floor);
-      for (let i = 1; i <= fNum; i++) {
-        const { data: floor } = await supabase.from('floors').insert({ building_id: bldg.id, floor_number: `Floor ${i}` }).select('id').single();
-        if (floor) {
-          for (let j = 1; j <= rNum; j++) {
-            const { data: room } = await supabase.from('rooms').insert({ floor_id: floor.id, room_number: `${i}0${j}`, total_seats: 4 }).select('id').single();
-            if (room) {
-              const seats = [1,2,3,4].map(s => ({ room_id: room.id, seat_number: `B${s}` }));
-              await supabase.from('seats').insert(seats);
-            }
-          }
-        }
-      }
+        floors: Number(newBldg.floors),
+        rooms_per_floor: Number(newBldg.rooms_per_floor),
+      });
 
       toast.success("Building created!");
       setOpenAdd(false);
-      loadData();
+      setNewBldg({ name: '', line_one: '', city_id: '', floors: '1', rooms_per_floor: '4' });
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || "Failed to create building");
     }
   };
 
@@ -97,20 +73,24 @@ export default function BuildingsPage() {
   };
 
   const onSettingsSubmit = async () => {
+    if (!selectedBldg) return;
     try {
-      const { error } = await supabase.from('buildings').update({
+      await updateSettings({
+        buildingId: selectedBldg.id,
         monthly_rent: Number(setts.monthly_rent),
         daily_rent: Number(setts.daily_rent),
         deposit_amount: Number(setts.deposit_amount)
-      }).eq('id', selectedBldg.id);
-      if (error) throw error;
+      });
       toast.success("Settings updated!");
       setOpenSettings(false);
-      loadData();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || "Failed to update settings");
     }
   };
+
+  if (loadingBuildings) {
+    return <div className="p-8 text-center text-slate-500 animate-pulse">Loading properties...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -158,8 +138,8 @@ export default function BuildingsPage() {
                  </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setOpenAdd(false)}>Cancel</Button>
-                <Button onClick={onAddBuilding}>Create Property</Button>
+                <Button variant="outline" onClick={() => setOpenAdd(false)} disabled={addingBuilding}>Cancel</Button>
+                <Button onClick={onAddBuilding} disabled={addingBuilding}>{addingBuilding ? 'Creating...' : 'Create Property'}</Button>
               </DialogFooter>
            </DialogContent>
         </Dialog>
@@ -192,6 +172,12 @@ export default function BuildingsPage() {
              </CardContent>
           </Card>
         ))}
+        {buildings.length === 0 && (
+          <div className="col-span-full py-12 text-center text-slate-500 border-2 border-dashed border-slate-200 rounded-2xl">
+            <Building2 className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+            <p>No buildings found.</p>
+          </div>
+        )}
       </div>
 
       {/* Settings Modal */}
@@ -201,20 +187,20 @@ export default function BuildingsPage() {
           <div className="space-y-4 py-4 text-left font-medium">
              <div className="space-y-2">
                <Label>Monthly Rent (₹)</Label>
-               <Input value={setts.monthly_rent} onChange={e => setSetts({...setts, monthly_rent: e.target.value})} />
+               <Input value={setts.monthly_rent} onChange={e => setSetts({...setts, monthly_rent: e.target.value})} type="number" />
              </div>
              <div className="space-y-2">
                <Label>Daily Rent (₹)</Label>
-               <Input value={setts.daily_rent} onChange={e => setSetts({...setts, daily_rent: e.target.value})} />
+               <Input value={setts.daily_rent} onChange={e => setSetts({...setts, daily_rent: e.target.value})} type="number" />
              </div>
              <div className="space-y-2">
                <Label>Security Deposit (₹)</Label>
-               <Input value={setts.deposit_amount} onChange={e => setSetts({...setts, deposit_amount: e.target.value})} />
+               <Input value={setts.deposit_amount} onChange={e => setSetts({...setts, deposit_amount: e.target.value})} type="number" />
              </div>
           </div>
           <DialogFooter>
-             <Button variant="outline" onClick={() => setOpenSettings(false)}>Cancel</Button>
-             <Button onClick={onSettingsSubmit}>Save Settings</Button>
+             <Button variant="outline" onClick={() => setOpenSettings(false)} disabled={updatingSettings}>Cancel</Button>
+             <Button onClick={onSettingsSubmit} disabled={updatingSettings}>{updatingSettings ? 'Saving...' : 'Save Settings'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
