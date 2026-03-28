@@ -10,7 +10,11 @@ type ResidentRow = Database['public']['Tables']['residents']['Row'];
 export interface ResidentWithRelations extends ResidentRow {
   building: { name: string } | null;
   floor: { floor_number: string } | null;
-  room: { room_number: string } | null;
+  room: { 
+    room_number: string;
+    room_types: { name: string } | null;
+    sharing_types: { name: string; capacity: number | null } | null;
+  } | null;
   seat: { seat_number: string } | null;
 }
 
@@ -24,7 +28,11 @@ export interface ResidentFull extends ResidentRow {
     } | null;
   } | null;
   floor: { floor_number: string } | null;
-  room: { room_number: string } | null;
+  room: { 
+    room_number: string;
+    room_types: { name: string } | null;
+    sharing_types: { name: string; capacity: number | null } | null;
+  } | null;
   seat: { seat_number: string; status: string } | null;
 }
 
@@ -57,7 +65,7 @@ export const useAdminResidents = createQuery<ResidentWithRelations[], { building
         *,
         building:buildings(name),
         floor:floors(floor_number),
-        room:rooms(room_number),
+        room:rooms(room_number, room_types(name), sharing_types(name)),
         seat:seats(seat_number)
       `)
       .in('building_id', variables.buildingIds)
@@ -76,7 +84,7 @@ export const useResidentById = createQuery<ResidentFull, { residentId: string }>
         *,
         building:buildings(*, address:addresses(*, city:cities(*))),
         floor:floors(*),
-        room:rooms(*),
+        room:rooms(*, room_types(*), sharing_types(*)),
         seat:seats(*)
       `)
       .eq('id', variables.residentId)
@@ -91,7 +99,7 @@ export const useMyResident = createQuery<any | null, { userId: string }>({
   fetcher: async (variables) => {
     const response = await supabase
       .from('residents')
-      .select('*, floor:floors(floor_number), room:rooms(room_number), seat:seats(seat_number), building:buildings(*, address:addresses(*, city:cities(*)))')
+      .select('*, floor:floors(floor_number), room:rooms(room_number, room_types(name), sharing_types(name)), seat:seats(seat_number), building:buildings(*, address:addresses(*, city:cities(*)))')
       .eq('user_id', variables.userId)
       .maybeSingle();
     if (response.error) throw response.error;
@@ -108,10 +116,10 @@ export const useResidentForEdit = createQuery<
   fetcher: async (variables) => {
     const response = await supabase
       .from('residents')
-      .select('*, building:buildings(name), room:rooms(room_number), seat:seats(seat_number)')
+      .select('*, building:buildings(name), room:rooms(room_number, room_types(name), sharing_types(name)), seat:seats(seat_number)')
       .eq('id', variables.residentId)
       .single();
-    return unwrapSupabaseResponse(response);
+    return unwrapSupabaseResponse(response) as ResidentWithRelations;
   },
 });
 

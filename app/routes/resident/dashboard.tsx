@@ -211,12 +211,12 @@ export default function ResidentDashboard() {
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
-               {[
-                 { icon: Building2, color: 'blue', label: 'Room', value: `R${resident.room?.room_number ?? '–'}`, sub: `Bed ${resident.seat?.seat_number ?? '–'}` },
-                 { icon: Calendar, color: 'orange', label: 'Joined', value: resident.join_date ? new Date(resident.join_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'N/A', sub: new Date(resident.join_date).getFullYear() },
-                 { icon: ShieldCheck, color: 'emerald', label: 'Status', value: resident.status, sub: 'Verified Stay' },
-                 { icon: Clock, color: 'purple', label: 'Cycle', value: 'Monthly', sub: 'Rent due on 1st' }
-               ].map((item, idx) => {
+                {[
+                  { icon: Building2, color: 'blue', label: 'Room', value: `R${resident.room?.room_number ?? '–'}`, sub: `${resident.room?.room_types?.name ?? ''} • ${resident.room?.sharing_types?.name ?? 'Bed ' + (resident.seat?.seat_number ?? '–')}` },
+                  { icon: Calendar, color: 'orange', label: 'Joined', value: resident.join_date ? new Date(resident.join_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'N/A', sub: new Date(resident.join_date).getFullYear() },
+                  { icon: ShieldCheck, color: 'emerald', label: 'Status', value: resident.status, sub: 'Verified Stay' },
+                  { icon: Clock, color: 'purple', label: 'Cycle', value: 'Monthly', sub: 'Rent due on 1st' }
+                ].map((item, idx) => {
                  const Icon = item.icon;
                  const colors = {
                     blue: 'bg-blue-50 text-blue-500',

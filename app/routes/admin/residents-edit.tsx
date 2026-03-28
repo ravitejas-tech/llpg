@@ -144,10 +144,18 @@ export default function EditResidentPage() {
 
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
                <h3 className="text-lg font-bold text-slate-900 mb-4 border-b pb-2">Allocation & Rent</h3>
-               <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-sm flex items-center gap-2">
-                  <OctagonAlert className="w-4 h-4"/> 
-                  Allocation: {resident?.building?.name} • Room {resident?.room?.room_number} • Bed {resident?.seat?.seat_number}
-               </div>
+                <div className="mb-4 p-4 bg-blue-50 text-blue-800 rounded-xl text-sm border border-blue-100">
+                   <div className="flex items-center gap-2 font-bold mb-1">
+                     <OctagonAlert className="w-4 h-4 text-blue-600"/> Current Allocation
+                   </div>
+                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-blue-700">
+                     <span>Building: <span className="font-semibold">{resident?.building?.name}</span></span>
+                     <span>Room: <span className="font-semibold">{resident?.room?.room_number}</span></span>
+                     <span>Type: <span className="font-semibold">{resident?.room?.room_types?.name || 'N/A'}</span></span>
+                     <span>Sharing: <span className="font-semibold">{resident?.room?.sharing_types?.name || 'N/A'}</span></span>
+                     <span>Bed: <span className="font-semibold">{resident?.seat?.seat_number}</span></span>
+                   </div>
+                </div>
                <div className="grid sm:grid-cols-2 gap-6">
                   <FormField control={form.control} name="stay_type" render={({field}) => (
                     <FormItem>

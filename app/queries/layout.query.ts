@@ -79,13 +79,22 @@ export const useFloors = createQuery<FloorBasic[], { buildingId: string }>({
 });
 
 /** Fetch rooms for a floor (dropdown) */
-export const useRooms = createQuery<RoomBasic[], { floorId: string }>({
+export const useRooms = createQuery<RoomBasic[], { floorId: string; roomTypeId?: string; sharingTypeId?: string }>({
   queryKey: ['rooms'],
   fetcher: async (variables) => {
-    const response = await supabase
+    let query = supabase
       .from('rooms')
       .select('id, room_number')
       .eq('floor_id', variables.floorId);
+    
+    if (variables.roomTypeId && variables.roomTypeId !== 'all') {
+      query = query.eq('room_type_id', variables.roomTypeId);
+    }
+    if (variables.sharingTypeId && variables.sharingTypeId !== 'all') {
+      query = query.eq('sharing_type_id', variables.sharingTypeId);
+    }
+    
+    const response = await query;
     return unwrapSupabaseResponse(response) as RoomBasic[];
   },
 });

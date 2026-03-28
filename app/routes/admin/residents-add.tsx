@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { ArrowLeft, UserPlus, Building2 } from 'lucide-react';
 import { useAdminBuildingsBasic } from '~/queries/buildings.query';
 import { useFloors, useRooms, useAvailableSeats } from '~/queries/layout.query';
+import { useRoomTypes, useSharingTypes } from '~/queries/room-types.query';
 import { useAddResident } from '~/queries/residents.query';
 import { useAuthStore } from '~/store/auth.store';
 import { Button } from '~/components/ui/button';
@@ -32,6 +33,8 @@ const residentSchema = z.object({
   deposit_amount: z.coerce.number().optional(),
   building_id: z.string().min(1, "Building is required"),
   floor_id: z.string().min(1, "Floor is required"),
+  room_type_id: z.string().optional(),
+  sharing_type_id: z.string().optional(),
   room_id: z.string().min(1, "Room is required"),
   seat_id: z.string().min(1, "Seat/Bed is required"),
 }).superRefine((data, ctx) => {
@@ -69,6 +72,8 @@ export default function AddResidentPage() {
       deposit_amount: 0,
       building_id: '',
       floor_id: '',
+      room_type_id: '',
+      sharing_type_id: '',
       room_id: '',
       seat_id: ''
     }
@@ -76,6 +81,8 @@ export default function AddResidentPage() {
 
   const buildingId = useWatch({ control: form.control, name: 'building_id' });
   const floorId = useWatch({ control: form.control, name: 'floor_id' });
+  const roomTypeId = useWatch({ control: form.control, name: 'room_type_id' });
+  const sharingTypeId = useWatch({ control: form.control, name: 'sharing_type_id' });
   const roomId = useWatch({ control: form.control, name: 'room_id' });
   const stayType = useWatch({ control: form.control, name: 'stay_type' });
 
@@ -88,9 +95,15 @@ export default function AddResidentPage() {
     enabled: !!buildingId 
   });
   const { data: rooms = [] } = useRooms({ 
-    variables: { floorId: floorId || '' }, 
+    variables: { 
+      floorId: floorId || '',
+      roomTypeId: roomTypeId || undefined,
+      sharingTypeId: sharingTypeId || undefined
+    }, 
     enabled: !!floorId 
   });
+  const { data: roomTypes = [] } = useRoomTypes();
+  const { data: sharingTypes = [] } = useSharingTypes();
   const { data: seats = [] } = useAvailableSeats({ 
     variables: { roomId: roomId || '' }, 
     enabled: !!roomId 
@@ -242,6 +255,59 @@ export default function AddResidentPage() {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="room_type_id"
+                    render={({ field }: { field: any }) => (
+                      <FormItem>
+                        <FormLabel>Room Type (Filter)</FormLabel>
+                        <Select 
+                          value={field.value} 
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue('room_id', '');
+                            form.setValue('seat_id', '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Any Type" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">Any Type</SelectItem>
+                            {roomTypes.map(rt => <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="sharing_type_id"
+                    render={({ field }: { field: any }) => (
+                      <FormItem>
+                        <FormLabel>Sharing (Filter)</FormLabel>
+                        <Select 
+                          value={field.value} 
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue('room_id', '');
+                            form.setValue('seat_id', '');
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Any Sharing" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">Any Sharing</SelectItem>
+                            {sharingTypes.map(st => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="room_id"

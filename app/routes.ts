@@ -27,6 +27,7 @@ export default [
     route("admin/expenses", "routes/admin/expenses.tsx"),
     route("admin/reminders", "routes/admin/reminders.tsx"),
     route("admin/reports", "routes/admin/reports.tsx"),
+    route("admin/room-types", "routes/admin/room-types.tsx"),
     route("admin/settings", "routes/admin/settings.tsx"),
   ]),
 

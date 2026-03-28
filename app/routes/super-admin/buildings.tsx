@@ -219,7 +219,7 @@ export default function BuildingsPage() {
                             <FormLabel>City *</FormLabel>
                             <FormControl>
                               <CityCombobox
-                                cities={cities}
+                                initialCities={cities}
                                 value={field.value}
                                 onValueChange={field.onChange}
                                 placeholder="Search and select city…"

@@ -201,6 +201,14 @@ export default function ResidentProfilePage() {
                 <span className="text-[10px] text-slate-400 uppercase tracking-widest">Bed/Seat</span>
                 <span className="text-sm font-medium text-slate-900">Bed {resident?.seat?.seat_number}</span>
               </div>
+              <div className="flex flex-col gap-1 px-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest">Room Type</span>
+                <span className="text-sm font-medium text-slate-900">{resident?.room?.room_types?.name || 'Standard'}</span>
+              </div>
+              <div className="flex flex-col gap-1 px-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest">Sharing</span>
+                <span className="text-sm font-medium text-slate-900">{resident?.room?.sharing_types?.name || 'N/A'}</span>
+              </div>
            </div>
         </div>
 

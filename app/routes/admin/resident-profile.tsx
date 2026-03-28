@@ -11,7 +11,7 @@ import { useResidentPayments } from '~/queries/payments.query';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Badge } from '~/components/ui/badge';
-import { getStatusColor, formatCurrency } from '~/lib/utils';
+import { getStatusColor, formatCurrency, cn } from '~/lib/utils';
 import { toast } from 'sonner';
 
 export default function ResidentProfilePage() {
@@ -168,8 +168,16 @@ export default function ResidentProfilePage() {
                 </div>
                 <div>
                   <label className="text-xs text-slate-400 uppercase font-bold tracking-wider">Allocation</label>
-                  <p className="font-semibold text-slate-900 mt-1">
-                    Floor {resident.floor?.floor_number || '-'} / Room {resident.room?.room_number || '-'} / {resident.seat?.seat_number || '-'}
+                  <p className="font-semibold text-slate-900 mt-1 flex flex-wrap items-center gap-2">
+                    F: {resident.floor?.floor_number || '-'} / R: {resident.room?.room_number || '-'} / B: {resident.seat?.seat_number || '-'}
+                    {resident.room?.room_types?.name && (
+                      <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border", resident.room.room_types.name.toLowerCase().includes('ac') ? 'bg-cyan-50 text-cyan-700 border-cyan-100' : 'bg-orange-50 text-orange-700 border-orange-100')}>
+                        {resident.room.room_types.name}
+                      </span>
+                    )}
+                    {resident.room?.sharing_types?.name && (
+                      <span className="text-xs text-slate-500 font-medium whitespace-nowrap">({resident.room.sharing_types.name})</span>
+                    )}
                   </p>
                 </div>
                 <div>

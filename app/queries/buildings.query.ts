@@ -119,15 +119,31 @@ export const useBuildingById = createQuery<BuildingWithAddress, { buildingId: st
   },
 });
 
-/** Fetch all cities with state info (used in dropdowns) */
-export const useCities = createQuery<CityBasic[]>({
-  queryKey: buildingKeys.cities,
-  fetcher: async () => {
-    const response = await supabase
+/** Fetch cities with state info (used in dropdowns, supports search) */
+export const useCities = createQuery<CityBasic[], { searchTerm?: string } | void>({
+  queryKey: ['cities'],
+  fetcher: async (variables) => {
+    const term = variables?.searchTerm || '';
+    console.log('[useCities] fetcher started. Term:', term);
+    
+    let query = supabase
       .from('cities')
       .select('id, name, state:states(name)')
       .order('name');
-    return unwrapSupabaseResponse(response) as unknown as CityBasic[];
+    
+    if (term) {
+      query = query.ilike('name', `%${term}%`);
+    }
+
+    const { data, error } = await query.limit(100);
+    
+    if (error) {
+      console.error('[useCities] Supabase error:', error);
+      throw error;
+    }
+
+    console.log(`[useCities] Found ${data?.length || 0} cities for "${term}"`);
+    return data as unknown as CityBasic[];
   },
 });
 
@@ -239,7 +255,7 @@ export const useBuildingLayout = createQuery<any[], { buildingId: string }>({
   fetcher: async (variables) => {
     const response = await supabase
       .from('floors')
-      .select('*, rooms(*, seats(*))')
+      .select('*, rooms(*, room_types(*), sharing_types(*), seats(*))')
       .eq('building_id', variables.buildingId)
       .order('floor_number', { ascending: true });
     const data = unwrapSupabaseResponse(response);
@@ -269,6 +285,8 @@ interface AddRoomVariables {
   floorId: string;
   roomNumber: string;
   totalSeats: number;
+  roomTypeId?: string;
+  sharingTypeId?: string;
 }
 
 export const useAddRoom = createMutation<void, AddRoomVariables>({
@@ -278,6 +296,8 @@ export const useAddRoom = createMutation<void, AddRoomVariables>({
       floor_id: variables.floorId,
       room_number: variables.roomNumber,
       total_seats: variables.totalSeats,
+      room_type_id: variables.roomTypeId,
+      sharing_type_id: variables.sharingTypeId,
     }).select('id').single();
     
     const room = unwrapSupabaseResponse(roomResp);
@@ -289,6 +309,28 @@ export const useAddRoom = createMutation<void, AddRoomVariables>({
     }));
     const seatsResp = await supabase.from('seats').insert(seats);
     unwrapSupabaseResponse(seatsResp);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: buildingKeys.all });
+  },
+});
+
+interface UpdateRoomVariables {
+  roomId: string;
+  roomNumber?: string;
+  roomTypeId?: string;
+  sharingTypeId?: string;
+}
+
+export const useUpdateRoom = createMutation<void, UpdateRoomVariables>({
+  mutationFn: async (variables) => {
+    const updateData: any = {};
+    if (variables.roomNumber) updateData.room_number = variables.roomNumber;
+    if (variables.roomTypeId !== undefined) updateData.room_type_id = variables.roomTypeId;
+    if (variables.sharingTypeId !== undefined) updateData.sharing_type_id = variables.sharingTypeId;
+    
+    const response = await supabase.from('rooms').update(updateData).eq('id', variables.roomId);
+    unwrapSupabaseResponse(response);
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: buildingKeys.all });
