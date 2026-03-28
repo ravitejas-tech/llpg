@@ -14,7 +14,9 @@ import {
   useBuildingLayout, 
   useAddFloor, 
   useAddRoom,
-  useUpdateRoom
+  useUpdateRoom,
+  useUpdateBed,
+  useDeleteBed
 } from '~/queries/buildings.query';
 import { useRoomTypes, useSharingTypes } from '~/queries/room-types.query';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
@@ -28,6 +30,9 @@ export default function ManageBuildingLayout() {
   const [openEditRoom, setOpenEditRoom] = useState(false);
   const [selectedFloor, setSelectedFloor] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [openEditBed, setOpenEditBed] = useState(false);
+  const [selectedBed, setSelectedBed] = useState<any>(null);
+  const [newBedNum, setNewBedNum] = useState('');
   
   // Form States
   const [newFloorNum, setNewFloorNum] = useState('');
@@ -56,6 +61,8 @@ export default function ManageBuildingLayout() {
   const { mutateAsync: addFloorMutation } = useAddFloor();
   const { mutateAsync: addRoomMutation } = useAddRoom();
   const { mutateAsync: updateRoomMutation } = useUpdateRoom();
+  const { mutateAsync: updateBedMutation } = useUpdateBed();
+  const { mutateAsync: deleteBedMutation } = useDeleteBed();
 
   const addFloor = async () => {
     if (!newFloorNum || !id) return;
@@ -114,7 +121,35 @@ export default function ManageBuildingLayout() {
     setNewRoomNum(room.room_number);
     setSelectedRoomType(room.room_type_id || '');
     setSelectedSharingType(room.sharing_type_id || '');
+    setSeatsInRoom(String(room.total_seats || 4));
     setOpenEditRoom(true);
+  };
+
+  const openEditBedModal = (bed: any) => {
+    setSelectedBed(bed);
+    setNewBedNum(bed.seat_number);
+    setOpenEditBed(true);
+  };
+
+  const handleEditBed = async () => {
+    if (!selectedBed) return;
+    try {
+      await updateBedMutation({ id: selectedBed.id, seat_number: newBedNum });
+      toast.success("Bed number updated!");
+      setOpenEditBed(false);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const handleDeleteBed = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this bed?")) return;
+    try {
+      await deleteBedMutation(id);
+      toast.success("Bed deleted!");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   };
 
   if (loading) return <div className="p-20 text-center text-slate-400">Loading Layout...</div>;
@@ -205,20 +240,30 @@ export default function ManageBuildingLayout() {
                            </div>
                         </CardHeader>
                         <CardContent className="p-4 pt-2">
-                           <div className="flex flex-wrap gap-2 mt-4">
-                              {room.seats?.map((seat: any) => (
-                                <div 
-                                  key={seat.id} 
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${seat.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100' : 'bg-red-50 text-red-500 border border-red-100 opacity-60'}`}
-                                  title={seat.seat_number}
-                                >
-                                  <Bed className="w-5 h-5" />
-                                </div>
-                              ))}
-                              {(!room.seats || room.seats.length === 0) && (
-                                <div className="text-[10px] text-slate-400 italic">No seats added.</div>
-                              )}
-                           </div>
+                               <div className="flex flex-wrap gap-3 mt-4">
+                                  {room.seats?.map((seat: any) => (
+                                    <div key={seat.id} className="flex flex-col items-center gap-1 group relative">
+                                      <div 
+                                        className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${seat.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100' : 'bg-red-50 text-red-500 border border-red-100'}`}
+                                        onClick={() => openEditBedModal(seat)}
+                                      >
+                                        <Bed className="w-5 h-5 mb-0.5" />
+                                        <span className="text-[9px] font-bold uppercase">{seat.seat_number}</span>
+                                      </div>
+                                      {seat.status === 'AVAILABLE' && (
+                                        <button 
+                                          onClick={() => handleDeleteBed(seat.id)}
+                                          className="absolute -top-1 -right-1 bg-white border border-slate-200 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                                        >
+                                          <Plus className="w-2.5 h-2.5 rotate-45" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {(!room.seats || room.seats.length === 0) && (
+                                    <div className="text-[10px] text-slate-400 italic">No seats added.</div>
+                                  )}
+                               </div>
                         </CardContent>
                      </Card>
                    ))}
@@ -254,10 +299,6 @@ export default function ManageBuildingLayout() {
               <Label>Room Number / Name</Label>
               <Input value={newRoomNum} onChange={e => setNewRoomNum(e.target.value)} placeholder="e.g. 101, A1" />
             </div>
-            <div className="space-y-2">
-              <Label>Number of Seats (Beds)</Label>
-              <Input type="number" value={seatsInRoom} onChange={e => setSeatsInRoom(e.target.value)} />
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Room Type</Label>
@@ -270,13 +311,30 @@ export default function ManageBuildingLayout() {
               </div>
               <div className="space-y-2">
                 <Label>Sharing Type</Label>
-                <Select value={selectedSharingType} onValueChange={setSelectedSharingType}>
+                <Select value={selectedSharingType} onValueChange={(v) => {
+                  setSelectedSharingType(v);
+                  const st = sharingTypes.find(s => s.id === v);
+                  if (st) setSeatsInRoom(String(st.capacity));
+                }}>
                   <SelectTrigger><SelectValue placeholder="Single, Double..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Custom / None</SelectItem>
                     {sharingTypes.map(st => <SelectItem key={st.id} value={st.id}>{st.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Number of Seats (Beds)</Label>
+              <Input 
+                type="number" 
+                value={seatsInRoom} 
+                onChange={e => setSeatsInRoom(e.target.value)} 
+                disabled={selectedSharingType !== '' && selectedSharingType !== 'none'}
+              />
+              {(selectedSharingType !== '' && selectedSharingType !== 'none') && (
+                <p className="text-[10px] text-blue-500 italic">Locked to {sharingTypes.find(s => s.id === selectedSharingType)?.name} capacity</p>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -321,6 +379,23 @@ export default function ManageBuildingLayout() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenEditRoom(false)}>Cancel</Button>
             <Button onClick={handleEditRoomSubmit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Bed Modal */}
+      <Dialog open={openEditBed} onOpenChange={setOpenEditBed}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Edit Bed Number</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4 text-left">
+            <div className="space-y-2">
+              <Label>Bed Label (e.g. B1, Bed A)</Label>
+              <Input value={newBedNum} onChange={e => setNewBedNum(e.target.value)} placeholder="B1" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenEditBed(false)}>Cancel</Button>
+            <Button onClick={handleEditBed}>Update Bed</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

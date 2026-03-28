@@ -291,21 +291,29 @@ interface AddRoomVariables {
 
 export const useAddRoom = createMutation<void, AddRoomVariables>({
   mutationFn: async (variables) => {
-    // 1. Create Room
+    // 1. Get sharing type capacity if provided
+    let capacity = variables.totalSeats;
+    if (variables.sharingTypeId && variables.sharingTypeId !== 'none') {
+      const { data: st } = await supabase.from('sharing_types').select('capacity').eq('id', variables.sharingTypeId).single();
+      if (st) capacity = st.capacity;
+    }
+
+    // 2. Create Room
     const roomResp = await supabase.from('rooms').insert({
       floor_id: variables.floorId,
       room_number: variables.roomNumber,
-      total_seats: variables.totalSeats,
-      room_type_id: variables.roomTypeId,
-      sharing_type_id: variables.sharingTypeId,
+      total_seats: capacity,
+      room_type_id: variables.roomTypeId === 'none' ? null : variables.roomTypeId,
+      sharing_type_id: variables.sharingTypeId === 'none' ? null : variables.sharingTypeId,
     }).select('id').single();
     
     const room = unwrapSupabaseResponse(roomResp);
 
-    // 2. Create Seats
-    const seats = Array.from({ length: variables.totalSeats }).map((_, i) => ({
+    // 3. Create Seats
+    const seats = Array.from({ length: capacity }).map((_, i) => ({
       room_id: room.id,
       seat_number: `B${i + 1}`,
+      status: 'AVAILABLE'
     }));
     const seatsResp = await supabase.from('seats').insert(seats);
     unwrapSupabaseResponse(seatsResp);
@@ -324,17 +332,94 @@ interface UpdateRoomVariables {
 
 export const useUpdateRoom = createMutation<void, UpdateRoomVariables>({
   mutationFn: async (variables) => {
-    const updateData: any = {};
-    if (variables.roomNumber) updateData.room_number = variables.roomNumber;
-    if (variables.roomTypeId !== undefined) updateData.room_type_id = variables.roomTypeId;
-    if (variables.sharingTypeId !== undefined) updateData.sharing_type_id = variables.sharingTypeId;
+    const { roomId, roomNumber, roomTypeId, sharingTypeId } = variables;
     
-    const response = await supabase.from('rooms').update(updateData).eq('id', variables.roomId);
+    // 1. Fetch current room state including sharing type
+    const { data: room, error: roomErr } = await supabase
+      .from('rooms')
+      .select('*, seats(*)')
+      .eq('id', roomId)
+      .single();
+    
+    if (roomErr || !room) throw new Error("Room not found");
+
+    const updateData: any = {};
+    if (roomNumber) {
+      // Check for duplicate room number on the same floor
+      const { data: dup } = await supabase.from('rooms').select('id').eq('floor_id', room.floor_id).eq('room_number', roomNumber).neq('id', roomId).maybeSingle();
+      if (dup) throw new Error(`Room number ${roomNumber} already exists on this floor`);
+      updateData.room_number = roomNumber;
+    }
+    
+    if (roomTypeId !== undefined) updateData.room_type_id = roomTypeId === 'none' ? null : roomTypeId;
+    
+    if (sharingTypeId !== undefined && sharingTypeId !== room.sharing_type_id) {
+      updateData.sharing_type_id = sharingTypeId === 'none' ? null : sharingTypeId;
+      
+      // Handle capacity change
+      if (sharingTypeId !== 'none') {
+        const { data: st } = await supabase.from('sharing_types').select('capacity').eq('id', sharingTypeId).single();
+        if (st) {
+          const newCap = st.capacity;
+          const currentSeats = room.seats || [];
+          const currentCount = currentSeats.length;
+          
+          if (newCap > currentCount) {
+             // Add seats
+             const toAdd = newCap - currentCount;
+             const newSeats = Array.from({ length: toAdd }).map((_, i) => ({
+               room_id: roomId,
+               seat_number: `B${currentCount + i + 1}`,
+               status: 'AVAILABLE'
+             }));
+             await supabase.from('seats').insert(newSeats);
+          } else if (newCap < currentCount) {
+             // Remove extra seats (last ones first)
+             const toRemove = currentSeats
+               .slice(newCap)
+               .sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
+             
+             // Check if any toremove is occupied
+             const occupied = toRemove.find((s: any) => s.status === 'OCCUPIED');
+             if (occupied) {
+                throw new Error(`Cannot reduce capacity: Bed ${occupied.seat_number} is occupied`);
+             }
+             
+             await supabase.from('seats').delete().in('id', toRemove.map((s: any) => s.id));
+          }
+          updateData.total_seats = newCap;
+        }
+      }
+    }
+    
+    const response = await supabase.from('rooms').update(updateData).eq('id', roomId);
     unwrapSupabaseResponse(response);
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: buildingKeys.all });
   },
+});
+
+export const useUpdateBed = createMutation<void, { id: string; seat_number: string }>({
+  mutationFn: async ({ id, seat_number }) => {
+    const res = await supabase.from('seats').update({ seat_number }).eq('id', id);
+    unwrapSupabaseResponse(res);
+  },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: buildingKeys.all })
+});
+
+export const useDeleteBed = createMutation<void, string>({
+  mutationFn: async (id) => {
+    // Check occupancy
+    const { data: seat } = await supabase.from('seats').select('status, seat_number').eq('id', id).single();
+    if (seat?.status === 'OCCUPIED') {
+      throw new Error(`Cannot delete bed ${seat.seat_number} as it is assigned to a resident`);
+    }
+    
+    const res = await supabase.from('seats').delete().eq('id', id);
+    unwrapSupabaseResponse(res);
+  },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: buildingKeys.all })
 });
 
 // ─── Invalidation helpers ─────────────────────────────────────────────────

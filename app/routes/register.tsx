@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Building2, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -17,8 +18,11 @@ import {
   useRegisterUser
 } from '~/queries/register.query';
 
+import { useAuthStore } from '~/store/auth.store';
+
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const authStore = useAuthStore();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -74,13 +78,16 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await registerUser(form as any);
-      navigate('/login?registered=true');
+      // Initialize auth store to capture the new session/role
+      await authStore.initialize();
+      toast.success("Registration successful!");
+      navigate('/resident');
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [form, navigate, registerUser]);
+  }, [form, navigate, registerUser, authStore]);
 
   return (
     <div className="min-h-screen bg-slate-50 py-10 px-4">
@@ -178,16 +185,29 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Room *</Label>
-                    <Select value={form.room_id} onValueChange={v => { update('room_id', v); update('seat_id', ''); }} disabled={!form.floor_id}>
-                      <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
+                    <Select value={form.room_id} onValueChange={v => { update('room_id', v); update('seat_id', ''); }} disabled={!form.floor_id || rooms.length === 0}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          !form.floor_id 
+                            ? "Select Floor First" 
+                            : rooms.length === 0 
+                              ? `No ${roomTypes.find(rt => rt.id === form.room_type_id)?.name || ''} ${sharingTypes.find(st => st.id === form.sharing_type_id)?.name || ''} rooms available`
+                              : "Select Room"
+                        } />
+                      </SelectTrigger>
                       <SelectContent>
                         {rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.room_number}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {form.floor_id && rooms.length === 0 && (
+                      <p className="text-[10px] text-red-500 font-medium">
+                        No rooms available for {roomTypes.find(rt => rt.id === form.room_type_id)?.name || 'any'} and {sharingTypes.find(st => st.id === form.sharing_type_id)?.name || 'any'} configuration on this floor.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Seat/Bed *</Label>
-                    <Select value={form.seat_id} onValueChange={v => update('seat_id', v)} disabled={!form.room_id}>
+                    <Select value={form.seat_id} onValueChange={v => update('seat_id', v)} disabled={!form.room_id || seats.length === 0}>
                       <SelectTrigger><SelectValue placeholder={!form.room_id ? "Select Room First" : seats.length ? "Select Bed" : "No beds available"} /></SelectTrigger>
                       <SelectContent>
                         {seats.map(s => <SelectItem key={s.id} value={s.id}>{s.seat_number}</SelectItem>)}
