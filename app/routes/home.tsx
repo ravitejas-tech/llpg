@@ -8,10 +8,6 @@ export default function HomePage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    initialize();
-  }, [initialize]);
-
-  useEffect(() => {
     if (!initialized) return;
     if (user) {
       if (user.role === 'SUPER_ADMIN') navigate('/super-admin');

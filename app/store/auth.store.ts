@@ -69,11 +69,28 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   initialize: async () => {
+    // If already initialized or currently loading, don't run again
+    const state = useAuthStore.getState();
+    if (state.initialized) return;
+
     set({ loading: true });
+
+    // Fail-safe timeout: ensure initialized is true after 5s regardless of network
+    const timeoutId = setTimeout(() => {
+      const currentState = useAuthStore.getState();
+      if (!currentState.initialized) {
+        console.warn("Auth initialization timed out. Forcing initialized state.");
+        set({ loading: false, initialized: true });
+      }
+    }, 5000);
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) throw sessionError;
+
       if (session?.user) {
-        const { data: roleData } = await supabase
+        const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
           .select('role, name, phone')
           .eq('user_id', session.user.id)
@@ -91,32 +108,42 @@ export const useAuthStore = create<AuthState>((set) => ({
           });
         }
       }
+    } catch (err) {
+      console.error("Auth initialization error:", err);
     } finally {
+      clearTimeout(timeoutId);
       set({ loading: false, initialized: true });
     }
 
+    // Single listener setup
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        set({ user: null });
+        set({ user: null, loading: false });
         return;
       }
+      
       if (session?.user) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role, name, phone')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        // Only fetch if user state is missing or doesn't match
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser || currentUser.id !== session.user.id) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role, name, phone')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
 
-        if (roleData) {
-          set({
-            user: {
-              id: session.user.id,
-              email: session.user.email ?? '',
-              role: roleData.role,
-              name: roleData.name,
-              phone: roleData.phone,
-            }
-          });
+          if (roleData) {
+            set({
+              user: {
+                id: session.user.id,
+                email: session.user.email ?? '',
+                role: roleData.role,
+                name: roleData.name,
+                phone: roleData.phone,
+              },
+              loading: false
+            });
+          }
         }
       }
     });

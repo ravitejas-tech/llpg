@@ -58,14 +58,8 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      // If signed out, redirect to login
       if (event === 'SIGNED_OUT') {
-        // Clear user state
-        useAuthStore.getState().setUser(null);
-        // Clear query cache on logout to prevent data leak
         qc.clear();
-        
-        // Don't redirect if already on login/register/root
         const publicPaths = ['/login', '/register', '/'];
         if (!publicPaths.includes(window.location.pathname)) {
           navigate('/login', { replace: true });
