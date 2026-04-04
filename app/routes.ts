@@ -4,6 +4,8 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("register", "routes/register.tsx"),
+  route("terms-and-conditions", "routes/terms.tsx"),
+  route("privacy-policy", "routes/privacy.tsx"),
 
   // Super Admin Routes
   layout("routes/super-admin/layout.tsx", [

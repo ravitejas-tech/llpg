@@ -333,9 +333,9 @@ export default function HomePage() {
             <span className="font-extrabold text-[#072b7e] font-headline text-lg sm:text-2xl mt-0.5 text-center">Lucky Luxury PG Services</span>
           </div>
           <div className="flex flex-wrap justify-center gap-6 md:gap-8 mb-2">
-            <a className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all" href="#">Privacy Policy</a>
-            <a className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all" href="#">Terms of Service</a>
-            <a className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all" href="#">Contact Us</a>
+            <Link className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all font-semibold" to="/privacy-policy">Privacy Policy</Link>
+            <Link className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all font-semibold" to="/terms-and-conditions">Terms & Conditions</Link>
+            <a className="text-[#444651] hover:text-[#072b7e] font-manrope text-xs md:text-sm transition-all" href="#contact">Contact Us</a>
           </div>
           <p className="text-[#444651] font-manrope text-xs md:text-sm leading-relaxed opacity-80 text-center">
             © 2024 Lucky Luxury PG Services. All rights reserved.

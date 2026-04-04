@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,18 +23,39 @@ import { useAuthStore } from '~/store/auth.store';
 export default function RegisterPage() {
   const navigate = useNavigate();
   const authStore = useAuthStore();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    const s = sessionStorage.getItem('register_step');
+    return s ? parseInt(s, 10) : 1;
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPwd, setShowPwd] = useState(false);
-  
-  const [form, setForm] = useState({
-    name: '', phone: '', email: '',
-    building_id: '', floor_id: '', room_type_id: '', sharing_type_id: '', room_id: '', seat_id: '',
-    line_one: '', line_two: '', state_id: '', city_id: '', pincode: '',
-    password: '', confirm_password: '',
-    age: '', gender: ''
+  const [agreed, setAgreed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('register_agreed') === 'true';
   });
+  
+  const [form, setForm] = useState(() => {
+    const defaultForm = {
+      name: '', phone: '', email: '',
+      building_id: '', floor_id: '', room_type_id: '', sharing_type_id: '', room_id: '', seat_id: '',
+      line_one: '', line_two: '', state_id: '', city_id: '', pincode: '',
+      password: '', confirm_password: '',
+      age: '', gender: ''
+    };
+    if (typeof window === 'undefined') return defaultForm;
+    try {
+      const saved = sessionStorage.getItem('register_form');
+      return saved ? { ...defaultForm, ...JSON.parse(saved) } : defaultForm;
+    } catch {
+      return defaultForm;
+    }
+  });
+
+  useEffect(() => { sessionStorage.setItem('register_step', step.toString()); }, [step]);
+  useEffect(() => { sessionStorage.setItem('register_agreed', agreed.toString()); }, [agreed]);
+  useEffect(() => { sessionStorage.setItem('register_form', JSON.stringify(form)); }, [form]);
 
   const { data: states = [] } = useRegistrationStates();
   const { data: buildings = [] } = useRegistrationBuildings();
@@ -66,7 +87,7 @@ export default function RegisterPage() {
   });
 
   const update = useCallback((field: string, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm((prev: any) => ({ ...prev, [field]: value }));
   }, []);
 
   const { mutateAsync: registerUser } = useRegisterUser();
@@ -79,6 +100,9 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await registerUser(form as any);
+      sessionStorage.removeItem('register_step');
+      sessionStorage.removeItem('register_form');
+      sessionStorage.removeItem('register_agreed');
       // Initialize auth store to capture the new session/role
       await authStore.initialize();
       toast.success("Registration successful!");
@@ -300,9 +324,23 @@ export default function RegisterPage() {
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
                   <strong>Note:</strong> Your application will be reviewed by the PG Admin. You'll receive access once approved.
                 </div>
+                
+                <div className="flex items-start gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <input 
+                    type="checkbox" 
+                    id="terms" 
+                    className="mt-1 flex-shrink-0 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                  />
+                  <Label htmlFor="terms" className="text-sm text-slate-600 leading-tight pt-0.5 cursor-pointer">
+                    I agree to the <Link to="/terms-and-conditions" className="text-[#072b7e] font-bold hover:underline">Terms & Conditions</Link> and <Link to="/privacy-policy" className="text-[#072b7e] font-bold hover:underline">Privacy Policy</Link>.
+                  </Label>
+                </div>
+
                 <div className="flex gap-3">
                   <Button type="button" variant="outline" className="flex-1" size="lg" onClick={() => setStep(2)}>← Back</Button>
-                  <Button type="submit" className="flex-1" size="lg" loading={loading}>Register</Button>
+                  <Button type="submit" className="flex-1" size="lg" loading={loading} disabled={!agreed || !form.password || !form.confirm_password}>Register</Button>
                 </div>
               </div>
             )}

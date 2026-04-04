@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, useNavigate, Link, useLocation } from 'react-router';
-import { Building2, LayoutDashboard, LogOut, IndianRupee } from 'lucide-react';
+import { Building2, LayoutDashboard, LogOut, IndianRupee, FileText, Shield } from 'lucide-react';
 import { useAuthStore } from '~/store/auth.store';
 import { cn } from '~/lib/utils';
 import { Button } from '~/components/ui/button';
@@ -22,6 +22,8 @@ export default function ResidentLayout() {
   const navItems = [
     { icon: LayoutDashboard, label: 'My Stay', path: '/resident' },
     { icon: IndianRupee, label: 'Payments', path: '/resident/payments' },
+    { icon: FileText, label: 'Terms & Conditions', path: '/terms-and-conditions' },
+    { icon: Shield, label: 'Privacy Policy', path: '/privacy-policy' },
   ];
 
   return (
