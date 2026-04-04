@@ -1,15 +1,90 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { useAuthStore } from '~/store/auth.store';
 import { 
   ArrowRight, ShieldCheck, Wifi, Utensils, Sparkles, Shield, Zap, 
   ChevronLeft, ChevronRight, User, Phone, MessageCircle, Mail, MapPin,
-  Home, Compass, Heart, Star
+  Home, Compass, Heart, Star, Car, Shirt, Flame
 } from 'lucide-react';
 
 export default function HomePage() {
   const { user, initialize, initialized } = useAuthStore();
   const navigate = useNavigate();
+
+  const amenitiesRef = useRef<HTMLDivElement>(null);
+  const isHoveredRef = useRef(false);
+
+  useEffect(() => {
+    const el = amenitiesRef.current;
+    if (!el) return;
+
+    let animationFrameId: number;
+    // Track scroll position in float for sub-pixel precision
+    let scrollPos = el.scrollLeft;
+
+    const animate = () => {
+      if (!isHoveredRef.current) {
+        scrollPos += 0.5; // continuous linear speed
+        
+        // Exact element where loop duplicates
+        const resetNode = el.children[6] as HTMLElement;
+        const resetPoint = resetNode ? resetNode.offsetLeft : el.scrollWidth / 2;
+
+        if (scrollPos >= resetPoint) {
+          scrollPos -= resetPoint;
+        }
+
+        // if user manually scrolled significantly, sync up
+        if (Math.abs(scrollPos - el.scrollLeft) > 5) {
+          scrollPos = el.scrollLeft;
+        }
+
+        el.scrollLeft = scrollPos;
+      } else {
+        // while hovering or touching, keep tracker synced with actual scroll
+        scrollPos = el.scrollLeft;
+      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  const amenityCards = (
+    <>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Wifi className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">High Speed 5G WiFi</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">Seamless high-speed internet for work and entertainment</p>
+      </div>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Utensils className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">Meals</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">Nutritious and hygienic meals served daily. <br/><span className="block mt-2 opacity-90"><strong className="font-bold">Weekdays:</strong> Breakfast & Dinner <br/><strong className="font-bold">Weekends:</strong> Breakfast, Lunch & Dinner</span></p>
+      </div>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Car className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">Parking</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">Secure and convenient parking space available for all residents.</p>
+      </div>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Sparkles className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">Daily Cleaning</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">Regular housekeeping for a clean and comfortable stay.</p>
+      </div>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Shirt className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">Washing Machine</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">Easy access to modern laundry facilities.</p>
+      </div>
+      <div className="flex-none w-[85%] sm:w-[350px] bg-surface-container-lowest p-8 rounded-2xl shadow-premium group hover:bg-primary transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl border-b-4 border-transparent hover:border-white/20">
+        <Flame className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors duration-300" />
+        <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-3 transition-colors duration-300">Hot Water</h3>
+        <p className="text-on-surface-variant group-hover:text-primary-container text-sm leading-relaxed transition-colors duration-300">24/7 hot water availability for ultimate comfort.</p>
+      </div>
+    </>
+  );
 
   useEffect(() => {
     if (!initialized) return;
@@ -136,12 +211,12 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-7xl mx-auto">
             <div className="bg-surface-container-lowest p-6 rounded-xl shadow-premium flex flex-col items-center text-center">
               <User className="text-primary w-8 h-8 mb-2" />
-              <h3 className="text-2xl font-extrabold text-tertiary">500+</h3>
+              <h3 className="text-2xl font-extrabold text-tertiary">3000+</h3>
               <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Residents</p>
             </div>
             <div className="bg-surface-container-lowest p-6 rounded-xl shadow-premium flex flex-col items-center text-center">
               <MapPin className="text-primary w-8 h-8 mb-2" />
-              <h3 className="text-2xl font-extrabold text-tertiary">50+</h3>
+              <h3 className="text-2xl font-extrabold text-tertiary">10+</h3>
               <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Properties</p>
             </div>
             <div className="bg-surface-container-lowest p-6 rounded-xl shadow-premium flex flex-col items-center text-center">
@@ -151,8 +226,8 @@ export default function HomePage() {
             </div>
             <div className="bg-surface-container-lowest p-6 rounded-xl shadow-premium flex flex-col items-center text-center">
               <Sparkles className="text-primary w-8 h-8 mb-2" />
-              <h3 className="text-2xl font-extrabold text-tertiary">10+</h3>
-              <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Awards</p>
+              <h3 className="text-2xl font-extrabold text-tertiary">98%</h3>
+              <p className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Comfort</p>
             </div>
           </div>
         </section>
@@ -161,47 +236,21 @@ export default function HomePage() {
         <section className="bg-surface-container-low py-12 md:py-24 px-6 md:block" id="amenities">
           <div className="max-w-7xl mx-auto scroll-reveal opacity-0 translate-y-8">
             <div className="mb-12 md:mb-16">
-              <h2 className="text-[1.75rem] font-bold text-tertiary font-headline mb-4">World-Class Amenities</h2>
+              <h2 className="text-[1.75rem] font-bold text-tertiary font-headline mb-4">Amenities and Services</h2>
               <div className="h-1 w-12 bg-primary mt-2 mb-4 rounded-full md:hidden"></div>
               <p className="text-on-surface-variant max-w-2xl">Everything you need to thrive, curated with a concierge touch to ensure you never have to worry about the small things.</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-6">
-              {/* High Speed Wi-Fi */}
-              <div className="md:col-span-2 lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-premium group hover:bg-primary transition-colors duration-300 scroll-reveal opacity-0 translate-y-8">
-                <Wifi className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors" />
-                <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-2 transition-colors">Gigabit Wi-Fi</h3>
-                <p className="text-on-surface-variant group-hover:text-primary-fixed text-sm leading-relaxed transition-colors">Dedicated high-speed connectivity for seamless remote work and streaming.</p>
-              </div>
-              {/* Gourmet Dining */}
-              <div className="md:col-span-2 lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-premium group hover:bg-primary transition-colors duration-300 scroll-reveal opacity-0 translate-y-8" style={{ transitionDelay: '0.1s' }}>
-                <Utensils className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors" />
-                <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-2 transition-colors">Gourmet Meals</h3>
-                <p className="text-on-surface-variant group-hover:text-primary-fixed text-sm leading-relaxed transition-colors">Nutritious, chef-prepared meals served daily in our communal dining area.</p>
-              </div>
-              {/* Daily Housekeeping */}
-              <div className="md:col-span-4 lg:col-span-2 bg-surface-container-lowest p-8 rounded-xl shadow-premium group hover:bg-primary transition-colors duration-300 scroll-reveal opacity-0 translate-y-8" style={{ transitionDelay: '0.2s' }}>
-                <Sparkles className="w-10 h-10 text-primary group-hover:text-on-primary mb-6 transition-colors" />
-                <h3 className="text-xl font-bold text-tertiary group-hover:text-on-primary mb-2 transition-colors">Daily Cleaning</h3>
-                <p className="text-on-surface-variant group-hover:text-primary-fixed text-sm leading-relaxed transition-colors">Meticulous housekeeping ensures your living space remains pristine.</p>
-              </div>
-              {/* 24/7 Security */}
-              <div className="md:col-span-3 lg:col-span-3 bg-surface-container-lowest p-8 rounded-xl shadow-premium flex items-center gap-8 scroll-reveal opacity-0 translate-y-8" style={{ transitionDelay: '0.3s' }}>
-                <div className="p-4 bg-surface-container-high rounded-full">
-                  <Shield className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-tertiary mb-2">Biometric Security</h3>
-                  <p className="text-on-surface-variant text-sm">24/7 surveillance and secure biometric access control.</p>
-                </div>
-              </div>
-              {/* Power Backup */}
-              <div className="md:col-span-1 lg:col-span-3 bg-primary-container p-8 rounded-xl shadow-premium relative overflow-hidden scroll-reveal opacity-0 translate-y-8" style={{ transitionDelay: '0.4s' }}>
-                <div className="relative z-10">
-                  <h3 className="text-xl font-bold text-on-primary mb-2">Always Powered</h3>
-                  <p className="text-on-primary-container text-sm">100% power backup for uninterrupted comfort.</p>
-                </div>
-                <Zap className="absolute -right-4 -bottom-4 w-40 h-40 text-white opacity-10" />
-              </div>
+            <div 
+              className="flex overflow-x-auto gap-4 md:gap-6 pb-4 md:pb-0 relative" 
+              ref={amenitiesRef} 
+              style={{ scrollbarWidth: 'none' }}
+              onMouseEnter={() => isHoveredRef.current = true}
+              onMouseLeave={() => isHoveredRef.current = false}
+              onTouchStart={() => isHoveredRef.current = true}
+              onTouchEnd={() => isHoveredRef.current = false}
+            >
+              {amenityCards}
+              {amenityCards}
             </div>
           </div>
         </section>
@@ -210,7 +259,7 @@ export default function HomePage() {
         <section className="py-12 md:py-24 px-6 max-w-7xl mx-auto overflow-hidden" id="rooms">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 md:mb-16 gap-6 scroll-reveal opacity-0 translate-y-8">
             <div>
-              <h2 className="text-[1.75rem] font-bold text-tertiary font-headline mb-4">Premium Room Categories</h2>
+              <h2 className="text-[1.75rem] font-bold text-tertiary font-headline mb-4">Available Options</h2>
               <p className="text-on-surface-variant max-w-xl text-sm md:text-base">Select the configuration that suits your needs. Each room is fully furnished with premium linens and ergonomic furniture.</p>
             </div>
             <div className="hidden md:flex gap-4">
@@ -228,25 +277,23 @@ export default function HomePage() {
             <div className="group flex-none w-[85%] md:w-auto snap-center">
               <div className="relative aspect-video md:aspect-video rounded-xl overflow-hidden mb-6">
                 <img alt="spacious single occupancy room" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFGZNIGSezL2fOWESITZwDsU_X73AfRUZmEldSb6jRmSBH2BI5Ivqhgj4Il5Wq6XDCn9QzEBYNC77x1Vu-4Jz_nvW9XINQ1IDpqX9n7waIMGjr36P9L73YSNpb8ApNS09PBvBKWLX51yvDr6GOiLEWWehCLL0uaOgCz_dhLVthFG1tB4WF8iz3YoklKQ_yjlav9U0Lzc44UXbJI4TNtwbpWG0b5g8OQWCNb7XiZQBC6ZkncYL6THnreIsB5z3AqvlVL0OJbxx_9Jc" />
-                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">Single Occupancy</div>
+                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">One Sharing</div>
               </div>
-              <h3 className="text-xl font-bold text-tertiary mb-2">Executive Solo Suite</h3>
-              <p className="text-on-surface-variant text-sm mb-4">Full privacy with an attached balcony and dedicated workspace.</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">AC Room</span>
-                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Attached Bath</span>
+              <h3 className="text-xl font-bold text-tertiary mb-2">One Sharing</h3>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">AC / Non-AC</span>
+                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Attached Bathrooms</span>
               </div>
             </div>
             {/* Room Card 2 */}
             <div className="group flex-none w-[85%] md:w-auto snap-center">
               <div className="relative aspect-video md:aspect-video rounded-xl overflow-hidden mb-6">
                 <img alt="modern double sharing room" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBhtCEObK89--F-8-PAsLA68Dp2RDlXtjmclUrJ1rwDP1mUgxPhdDPWFnQA3O4Go-PPpkVgHSyl4uxV6TM1mWqQrbsp-CEmp3Y0V0r2wNI70QWEbu6NxH2V2pHaRJ-bbMhhjAkmO-kpmwiZFaZVNZzBZHXO54bT1fgKt0sQ9dyXkOEROb-BoJfj0i5DHKaSs5P6cQxW-mw-Ucdh8BLvPmUyIz9m-Sv9wIoo9zKL9tzxiExE436RYTUjj35m95tWl163WI4xncUYreQ" />
-                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">Double Sharing</div>
+                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">Two Sharing</div>
               </div>
-              <h3 className="text-xl font-bold text-tertiary mb-2">Premium Shared Studio</h3>
-              <p className="text-on-surface-variant text-sm mb-4">Spacious sharing arrangement without compromising on personal storage.</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Luxury Beds</span>
+              <h3 className="text-xl font-bold text-tertiary mb-2">Two Sharing</h3>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">AC / Non-AC</span>
                 <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Individual Lockers</span>
               </div>
             </div>
@@ -254,13 +301,12 @@ export default function HomePage() {
             <div className="group flex-none w-[85%] md:w-auto snap-center">
               <div className="relative aspect-video md:aspect-video rounded-xl overflow-hidden mb-6">
                 <img alt="ultra-premium suite room" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEYsCb0LUN4cZesCNnYdDJvDtC-1jFiD-hC9rXBQl6aHuXZDIRV1g1iIZXEbLJTDNWYP7YeDYbjj3zXeAJkpXuXu_iqQcIbGhTE5a0IjOEsQ0YDubU-dDdZOtIXxALxrIIb0mvro1TxdLDw69lX-dXP5s44V1DR7RViDqiMHAkYQZSzsLOrrsQvQnx3TUwn3EaBdmaDON_fbZJ34tzlR1jyE-M36IQqSW5mk2r4xY57iKf7QFeUxyKYPIhCtmk4zPxXxfNVtLVT_c" />
-                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">Elite Suite</div>
+                <div className="absolute top-4 right-4 bg-surface-container-lowest px-3 py-1 rounded-full text-xs font-bold text-primary shadow-sm">Quad Sharing</div>
               </div>
-              <h3 className="text-xl font-bold text-tertiary mb-2">Concierge Elite Penthouse</h3>
-              <p className="text-on-surface-variant text-sm mb-4">Our most exclusive offering with personalized services and premium views.</p>
-              <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Smart TV</span>
-                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Priority Support</span>
+              <h3 className="text-xl font-bold text-tertiary mb-2">Quad Sharing</h3>
+              <div className="flex flex-wrap gap-2 mt-4">
+                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Attached Bathrooms</span>
+                <span className="px-3 py-1 bg-surface-container-high rounded-sm text-[0.7rem] font-bold text-on-surface uppercase tracking-wider">Individual Lockers</span>
               </div>
             </div>
           </div>
@@ -342,7 +388,7 @@ export default function HomePage() {
 
         {/* Contact & Concierge Details */}
         <section className="bg-tertiary text-on-tertiary py-12 md:py-24 px-6" id="contact">
-          <div className="max-w-7xl mx-auto scroll-reveal opacity-0 translate-y-8">
+          <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 md:gap-16 items-start">
               <div>
                 <h2 className="text-[1.75rem] font-bold mb-6 md:mb-8 font-headline">Contact Our Concierge</h2>
@@ -353,45 +399,54 @@ export default function HomePage() {
                       <User className="w-5 h-5 md:w-6 md:h-6 text-on-primary" />
                     </div>
                     <div>
-                      <p className="text-xs md:text-sm uppercase tracking-widest text-on-tertiary-container font-bold mb-1">General Manager</p>
-                      <p className="text-lg md:text-xl font-bold">Mr. Rajesh Lucky</p>
+                      <p className="text-xs md:text-sm uppercase tracking-widest text-on-tertiary-container font-bold mb-1">Managers</p>
+                      <p className="text-lg md:text-xl font-bold">Ramu & Shekhar</p>
                     </div>
                   </div>
                   <div className="flex flex-col md:flex-row gap-4">
-                    <a className="flex-1 bg-surface-container-lowest text-primary p-5 md:p-6 rounded-xl flex items-center md:flex-col md:items-start gap-3 md:gap-2 hover:bg-primary-fixed transition-all group" href="tel:+919876543210">
+                    <a className="flex-1 bg-surface-container-lowest text-primary p-5 md:p-6 rounded-xl flex items-center md:flex-col md:items-start gap-3 md:gap-2 hover:bg-primary-fixed transition-all group" href="tel:+919303003073">
                       <Phone className="w-6 h-6 md:w-8 md:h-8" />
-                      <span className="font-bold text-base md:text-lg">+91 98765 43210</span>
-                      <span className="hidden md:inline text-xs text-on-surface-variant font-bold uppercase tracking-wider">Click to Call</span>
+                      <span className="font-bold text-base md:text-lg">+91 93030 03073</span>
+                      <span className="hidden md:inline text-xs text-on-surface-variant font-bold uppercase tracking-wider">Call Ramu</span>
                     </a>
-                    <a className="flex-1 bg-[#25D366] text-white p-5 md:p-6 rounded-xl flex items-center md:flex-col md:items-start gap-3 md:gap-2 hover:opacity-90 transition-all active:scale-95" href="https://wa.me/919876543210">
+                    <a className="flex-1 bg-[#25D366] text-white p-5 md:p-6 rounded-xl flex items-center md:flex-col md:items-start gap-3 md:gap-2 hover:opacity-90 transition-all active:scale-95" href="https://wa.me/919303003073">
                       <MessageCircle className="w-6 h-6 md:w-8 md:h-8" />
-                      <span className="font-bold text-base md:text-lg">Chat on WhatsApp</span>
-                      <span className="hidden md:inline text-xs text-white/80 font-bold uppercase tracking-wider">Immediate Response</span>
+                      <span className="font-bold text-base md:text-lg">Chat with Ramu</span>
                     </a>
                   </div>
-                  <a className="flex items-center gap-4 md:gap-6 p-5 md:p-6 rounded-xl border border-white/10 hover:bg-white/5 transition-all w-full" href="mailto:info@luckyluxurypg.com">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <a className="flex-1 bg-surface-container-lowest text-primary p-5 md:p-6 rounded-xl flex items-center md:flex-col md:items-start gap-3 md:gap-2 hover:bg-primary-fixed transition-all group" href="tel:+919505539924">
+                      <Phone className="w-6 h-6 md:w-8 md:h-8" />
+                      <span className="font-bold text-base md:text-lg">+91 95055 39924</span>
+                      <span className="hidden md:inline text-xs text-on-surface-variant font-bold uppercase tracking-wider">Call Shekhar</span>
+                    </a>
+                  </div>
+                  <a className="flex items-center gap-4 md:gap-6 p-5 md:p-6 rounded-xl border border-white/10 hover:bg-white/5 transition-all w-full" href="mailto:luckyluxurypg@gmail.com">
                     <div className="bg-white/10 p-3 md:p-4 rounded-xl">
                       <Mail className="w-5 h-5 md:w-6 md:h-6 text-white" />
                     </div>
                     <div className="overflow-hidden">
                       <p className="text-xs md:text-sm uppercase tracking-widest text-on-tertiary-container font-bold mb-1">Official Email</p>
-                      <p className="text-base md:text-lg font-bold truncate">info@luckyluxurypg.com</p>
+                      <p className="text-base md:text-lg font-bold truncate">luckyluxurypg@gmail.com</p>
                     </div>
                   </a>
                 </div>
               </div>
-              <div className="space-y-8 scroll-reveal opacity-0 translate-y-8" style={{ transitionDelay: '0.2s' }}>
+              <div className="space-y-8">
                 <div className="bg-white/5 rounded-[1.5rem] p-6 md:p-8 backdrop-blur-sm border border-white/10">
                   <h3 className="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-3">
                     <MapPin className="w-5 h-5 md:w-6 md:h-6 text-primary-fixed" />
                     Location
                   </h3>
                   <p className="text-on-tertiary-container mb-4 md:mb-6 text-sm md:text-base leading-relaxed">
-                    Lucky Luxury PG Services, Plot No. 442, Phase II, Sector 54, Gurugram, Haryana 122003
+                    Lucky Luxury PG Services, Near Gold Gym, Pancard Club Road, Baner, Pune - 411045
                   </p>
-                  <div className="aspect-video w-full rounded-xl overflow-hidden grayscale hover:grayscale-0 transition-all duration-700 shadow-premium border border-outline-variant/20">
-                    <img alt="map showing location" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC31owDKoVonESMleg0msM5BTigP4BdiJUaZcZhHifTiNsGC-qbba76luOKPxa0C3NFzB3I7i9ryqmJPmkUYZRn-qmzzHb2mxPCQv6RmRiqm0gd4Zqn0BATdznw4JxaGdc8a_c4gBzk_2QH3WIM05Z5o79QaF5mtNQGMOScGkKW8P7y8MULBtinX-K_i2oxF_nyUf5dOLvfFIj8Y_TE3iMB2fOAEw_xKmSbp4gM6NisE0aB7yOpBQf_3YU8PXKDTjT_bNJhO2ZzjgU" />
-                  </div>
+                  <a href="https://maps.app.goo.gl/rymDQQpDiKdLMoiL9" target="_blank" rel="noreferrer" className="block w-full group">
+                    <div className="aspect-video w-full rounded-xl overflow-hidden shadow-premium border border-outline-variant/20 relative">
+                      <img alt="map showing location" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="/location.png" />
+                      <div className="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-xl"></div>
+                    </div>
+                  </a>
                 </div>
               </div>
             </div>
