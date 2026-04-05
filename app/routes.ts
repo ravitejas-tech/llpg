@@ -4,12 +4,15 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("register", "routes/register.tsx"),
+  route("terms-and-conditions", "routes/terms.tsx"),
+  route("privacy-policy", "routes/privacy.tsx"),
 
   // Super Admin Routes
   layout("routes/super-admin/layout.tsx", [
     route("super-admin", "routes/super-admin/dashboard.tsx"),
     route("super-admin/buildings", "routes/super-admin/buildings.tsx"),
     route("super-admin/admins", "routes/super-admin/admins.tsx"),
+    route("super-admin/admins-assign/:id", "routes/super-admin/admins-assign.$id.tsx"),
     route("super-admin/locations", "routes/super-admin/locations.tsx"),
     route("super-admin/settings", "routes/super-admin/settings.tsx"),
   ]),

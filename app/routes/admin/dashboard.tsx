@@ -12,12 +12,15 @@ import {
 
 import { useAdminDashboard } from '~/queries/dashboard.query';
 
+import { useManagementContext } from '~/hooks/use-management-context';
+
 export default function AdminDashboard() {
   const { user } = useAuthStore();
+  const { buildingIds } = useManagementContext();
   
   const { data, isLoading: loading } = useAdminDashboard({
-    variables: { adminId: user?.id || '' },
-    enabled: !!user?.id,
+    variables: { buildingIds },
+    enabled: buildingIds.length > 0,
   });
 
   const stats = data?.stats || {
@@ -41,7 +44,17 @@ export default function AdminDashboard() {
     { label: 'Outstanding Bills', value: formatCurrency(stats.outstandings), icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', trend: '-2.4%', up: false },
   ];
 
-  if (loading) return <div className="p-20 text-center animate-pulse text-slate-400">Loading Analytics...</div>;
+  if (loading && !!user?.id) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="w-10 h-10 border-4 border-slate-900 border-t-transparent rounded-full animate-spin" />
+        <div className="text-center">
+           <p className="text-slate-600 font-bold">Synchronizing Executive Data...</p>
+           <p className="text-slate-400 text-[10px] uppercase tracking-widest animate-pulse mt-1 font-bold">Secure connection established</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
