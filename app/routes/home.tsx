@@ -119,7 +119,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="font-body text-on-surface bg-surface selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen pb-16 md:pb-0 flex flex-col">
+    <div className="font-body text-on-surface bg-surface selection:bg-primary-fixed selection:text-on-primary-fixed min-h-screen flex flex-col">
       <style>{`
         .bg-hero-gradient { background: linear-gradient(135deg, #072b7e 0%, #284395 100%); }
         .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); }
@@ -471,26 +471,6 @@ export default function HomePage() {
           </p>
         </div>
       </footer>
-
-      {/* Bottom Navigation (Mobile Only) */}
-      <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-outline-variant/10 px-6 py-2 flex justify-between items-center z-50 md:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.03)] pb-safe">
-        <Link to="/" className="flex flex-col items-center text-primary pt-1 pb-1 px-3">
-          <Home className="w-6 h-6" strokeWidth={2.5} />
-          <span className="text-[10px] font-bold mt-1">Home</span>
-        </Link>
-        <Link to="/register" className="flex flex-col items-center text-on-surface-variant pt-1 pb-1 px-3 active:scale-95 transition-transform">
-          <Compass className="w-6 h-6" strokeWidth={2} />
-          <span className="text-[10px] font-medium mt-1">Explore</span>
-        </Link>
-        <button className="flex flex-col items-center text-on-surface-variant pt-1 pb-1 px-3 active:scale-95 transition-transform">
-          <Heart className="w-6 h-6" strokeWidth={2} />
-          <span className="text-[10px] font-medium mt-1">Saved</span>
-        </button>
-        <Link to="/login" className="flex flex-col items-center text-on-surface-variant pt-1 pb-1 px-3 active:scale-95 transition-transform">
-          <User className="w-6 h-6" strokeWidth={2} />
-          <span className="text-[10px] font-medium mt-1">Profile</span>
-        </Link>
-      </div>
     </div>
   );
 }
