@@ -58,9 +58,14 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // When user clicks the recovery link in their email, redirect to reset page
+        navigate('/reset-password', { replace: true });
+        return;
+      }
       if (event === 'SIGNED_OUT') {
         qc.clear();
-        const publicPaths = ['/login', '/register', '/'];
+        const publicPaths = ['/login', '/register', '/', '/forgot-password', '/reset-password'];
         if (!publicPaths.includes(window.location.pathname)) {
           navigate('/login', { replace: true });
         }
