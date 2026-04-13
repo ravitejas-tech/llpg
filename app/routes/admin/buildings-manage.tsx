@@ -333,7 +333,7 @@ export default function ManageBuildingLayout() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => navigate("/admin")}
+                        onClick={() => navigate("/admin/buildings")}
                         className="rounded-full shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5 text-slate-500" />
